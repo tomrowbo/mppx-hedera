@@ -1,8 +1,9 @@
 # mppx-hedera
 
-**First native [Machine Payments Protocol](https://mpp.dev) method for [Hedera](https://hedera.com).** Charge + session intents, no facilitator, MIT licensed.
+Native [Machine Payments Protocol](https://mpp.dev) method for [Hedera](https://hedera.com). Charge and session intents over USDC, settled directly on-chain — no facilitator required.
 
-MPP is the IETF-track HTTP 402 standard co-developed by Stripe and Tempo, with Visa, Mastercard, OpenAI, Anthropic, Shopify, and 100+ services in the launch directory. `mppx-hedera` adds Hedera as a first-class native payment method.
+[![npm](https://img.shields.io/npm/v/mppx-hedera)](https://www.npmjs.com/package/mppx-hedera)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## Install
 
@@ -12,7 +13,7 @@ npm install mppx-hedera mppx viem
 
 ## Quickstart
 
-### Server (5 lines)
+### Server
 
 ```ts
 import { Mppx } from 'mppx/server'
@@ -22,13 +23,14 @@ const mppx = Mppx.create({
   methods: [charge()],
 })
 
-// Any route — returns 402 if unpaid, 200 if paid
-const result = await mppx.charge({ amount: '0.01', description: 'Data query' })(request)
-if (result.status === 402) return result.challenge
-return result.withReceipt(Response.json({ data: '...' }))
+export async function handler(request: Request) {
+  const result = await mppx.charge({ amount: '0.01', description: 'Data query' })(request)
+  if (result.status === 402) return result.challenge
+  return result.withReceipt(Response.json({ data: '...' }))
+}
 ```
 
-### Client (5 lines)
+### Client
 
 ```ts
 import { Mppx } from 'mppx/client'
@@ -38,42 +40,43 @@ const mppx = Mppx.create({
   methods: [charge({ walletClient })],
 })
 
-// Handles 402 → sign USDC transfer → retry automatically
 const res = await mppx.fetch('/api/data', { method: 'POST' })
 ```
 
-## How it works
+The client automatically handles the `402 → sign USDC transfer → retry` flow.
 
-**Charge (one-time payment):**
-1. Client requests resource → server returns `402 Payment Required` with `WWW-Authenticate: Payment method="hedera"`
-2. Client signs an ERC-20 USDC transfer on Hedera via Hashio JSON-RPC
-3. Client retries with `Authorization: Payment <credential>` containing the txHash
-4. Server verifies via `getTransactionReceipt` + parses Transfer event from logs
-5. Server returns `200 OK` with `Payment-Receipt` header
+## Payment intents
 
-**Session (streaming micropayments):**
-1. Client approves USDC for the escrow contract (via `@hashgraph/sdk`)
-2. Client calls `escrow.open()` — deposits USDC, one on-chain tx
-3. Each subsequent request: client signs an EIP-712 voucher (cumulative amount) — **off-chain, sub-millisecond**
-4. Server verifies voucher via `ecrecover` — no RPC call, no gas
-5. On close: server calls `escrow.settle()` — one on-chain tx
+### Charge
 
-**Result: N API calls = 2 on-chain transactions.** Tested with 3 calls on Hedera testnet — 1 open tx, 2 off-chain vouchers.
+One-time payment per request. The client signs a standard ERC-20 USDC `transfer()` on Hedera and the server verifies the transaction receipt.
 
-## No facilitator
+```
+Client → POST /resource
+Server → 402 + WWW-Authenticate: Payment method="hedera"
+Client → signs USDC transfer via Hashio JSON-RPC
+Client → retries with Authorization: Payment <credential>
+Server → verifies receipt + Transfer event logs
+Server → 200 + Payment-Receipt header
+```
 
-x402 on Hedera routes every payment through [Blocky402](https://hedera.com/blog/hedera-and-the-x402-payment-standard/) — a third-party facilitator service. `mppx-hedera` verifies payments directly via Hedera's own infrastructure (Hashio JSON-RPC + Mirror Node). No middleman, no trust dependency.
+### Session
 
-| | x402 via Blocky402 | mppx-hedera |
-|---|---|---|
-| Parties in payment flow | 4 (client → server → facilitator/verify → facilitator/settle) | 2 (client → server) |
-| Third-party dependency | Yes | No |
-| Session support | No | Yes |
-| Integration | HTTP client to facilitator | `npm install mppx-hedera` |
+Streaming micropayments via payment channels. One on-chain deposit, unlimited off-chain vouchers, one on-chain settlement.
 
-## Composing with other methods
+```
+Client → approve USDC + escrow.open() → 1 on-chain tx
+Client → signs EIP-712 voucher per request → off-chain, <1ms
+Server → ecrecover verification → no RPC, no gas
+...repeat N times...
+Server → escrow.settle() → 1 on-chain tx
+```
 
-`mppx-hedera` is a drop-in alongside any other mppx payment method:
+**N requests = 2 on-chain transactions**, regardless of N.
+
+## Multi-method composition
+
+Register alongside any other mppx payment method in the same endpoint:
 
 ```ts
 import { Mppx, stripe } from 'mppx/server'
@@ -81,57 +84,87 @@ import { charge as hedera } from 'mppx-hedera/server'
 
 const mppx = Mppx.create({
   methods: [
-    hedera(),                              // USDC on Hedera
-    stripe.charge({ client: stripeClient }),  // Card via Stripe
+    hedera(),
+    stripe.charge({ client: stripeClient }),
   ],
 })
 ```
 
-The 402 challenge lists all methods; the client picks whichever it can pay with.
-
-## Hedera services used
-
-- **HTS** (Hedera Token Service) — USDC token for all payments
-- **EVM / Smart Contracts** — `HederaStreamChannel.sol` escrow via Foundry
-- **Mirror Node REST** — contract resolution + token balance queries
-- **JSON-RPC Relay (Hashio)** — standard EVM tooling (viem, Foundry, cast)
-- **HTS Precompile (0x167)** — contract self-association with USDC via `associateSelf()`
-
-## Hedera-specific notes
-
-Three things work differently on Hedera vs standard EVM:
-
-1. **Token approval:** ERC-20 `approve()` via the EVM relay reverts for HTS tokens. Use `@hashgraph/sdk` `AccountAllowanceApproveTransaction` instead — the native allowance is respected by EVM `transferFrom`.
-
-2. **Voucher signing:** Use raw ECDSA / `signTypedData` (EIP-712). Do NOT use `personal_sign` (`\x19Ethereum Signed Message` prefix) — the escrow contract expects the raw digest.
-
-3. **Gas estimation:** Hashio underestimates gas for contracts with HTS precompile calls. Always set explicit gas: `500_000n` for transfers, `1_500_000n` for escrow operations.
+The `402` challenge advertises all methods; the client uses whichever it supports.
 
 ## Deployed contracts
 
-| Network | Escrow contract | USDC token | Chain ID |
+| Network | HederaStreamChannel | USDC | Chain ID |
 |---|---|---|---|
-| Testnet | [`0x8226214188f22B9ddA901fb9ac85781eA4500D83`](https://hashscan.io/testnet/contract/0x8226214188f22B9ddA901fb9ac85781eA4500D83) | `0x0000000000000000000000000000000000001549` (0.0.5449) | 296 |
-| Mainnet | [`0x3cf652150A3f3CC768854dAb0c252E35eBd093A3`](https://hashscan.io/mainnet/contract/0x3cf652150A3f3CC768854dAb0c252E35eBd093A3) | `0x000000000000000000000000000000000006f89a` (0.0.456858, Circle native) | 295 |
+| Testnet | [`0x8226...D83`](https://hashscan.io/testnet/contract/0x8226214188f22B9ddA901fb9ac85781eA4500D83) | `0x...001549` (0.0.5449) | 296 |
+| Mainnet | [`0x3cf6...3A3`](https://hashscan.io/mainnet/contract/0x3cf652150A3f3CC768854dAb0c252E35eBd093A3) | `0x...06f89a` (0.0.456858, Circle) | 295 |
+
+Both contracts are verified on [Hashscan](https://hashscan.io). The escrow is a port of [Tempo's StreamChannel](https://github.com/tempoxyz/mpp-specs) via [@abstract-foundation/mpp](https://github.com/Abstract-Foundation/mpp-abstract), with the EIP-712 domain set to `"Hedera Stream Channel"`.
+
+## Hedera-specific considerations
+
+### Token approval
+
+HTS tokens do not support ERC-20 `approve()` through the Hedera JSON-RPC relay. Set allowances via the native Hedera SDK instead:
+
+```ts
+import { AccountAllowanceApproveTransaction } from '@hashgraph/sdk'
+
+await new AccountAllowanceApproveTransaction()
+  .approveTokenAllowance(tokenId, ownerId, spenderId, amount)
+  .execute(client)
+```
+
+The native allowance is fully respected by EVM `transferFrom` calls.
+
+### Voucher signing
+
+Session vouchers use EIP-712 typed data. Sign with `signTypedData` (raw ECDSA), not `personal_sign`. The escrow contract verifies via `ecrecover` on the raw EIP-712 digest.
+
+### Gas limits
+
+Hashio underestimates gas for transactions involving the HTS precompile. Set explicit limits:
+
+| Operation | Recommended gas |
+|---|---|
+| ERC-20 `transfer` | `500_000n` |
+| `escrow.open` / `settle` / `close` | `1_500_000n` |
+| `associateSelf` | `2_000_000n` |
+
+## Architecture
+
+```
+packages/mppx-hedera/
+├── src/
+│   ├── client/
+│   │   ├── charge.ts      ERC-20 transfer + Credential.serialize
+│   │   └── session.ts     Channel lifecycle + EIP-712 vouchers
+│   ├── server/
+│   │   ├── charge.ts      Receipt verification + Transfer event parsing
+│   │   └── session.ts     Voucher verification + on-chain settlement
+│   ├── constants.ts        Chain configs, contract addresses, ABIs
+│   └── internal.ts         Chain definitions, utilities
+│
+contracts/
+├── src/
+│   └── HederaStreamChannel.sol    ERC-20 payment channel escrow
+└── test/
+    └── HederaStreamChannel.t.sol  19 Foundry tests
+```
 
 ## Roadmap
 
 | Version | Features |
 |---|---|
-| **v0.1.0** | Charge + session intents, testnet + mainnet |
-| v0.2.0 | HCS audit trails, native `@hashgraph/sdk` client path |
-| v0.3.0 | Gasless via Hedera fee delegation |
-| v0.4.0 | PR to `wevm/mppx` core → listed on mpp.dev |
+| **0.1.x** | Charge + session intents, testnet + mainnet |
+| 0.2.0 | HCS audit trails for payment receipts |
+| 0.3.0 | Native `@hashgraph/sdk` client path, gasless via fee delegation |
+| 0.4.0 | PR to `wevm/mppx` core |
 
 ## Credits
 
-Forked from two production MIT-licensed packages:
-
-- **[@abstract-foundation/mpp](https://github.com/Abstract-Foundation/mpp-abstract)** — session intent, `StreamChannel` escrow contract (port of Tempo's)
-- **[@stablecoin.xyz/radius-mpp](https://www.npmjs.com/package/@stablecoin.xyz/radius-mpp)** — charge intent (plain ERC-20 transfer pattern)
-
-Built at the [Agentic Society Hackathon @ LSE](https://hedera.com), April 2026.
+Session infrastructure forked from [@abstract-foundation/mpp](https://github.com/Abstract-Foundation/mpp-abstract) (MIT). Charge pattern adapted from [@stablecoin.xyz/radius-mpp](https://www.npmjs.com/package/@stablecoin.xyz/radius-mpp) (MIT).
 
 ## License
 
-MIT
+[MIT](LICENSE)
