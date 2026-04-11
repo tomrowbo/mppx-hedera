@@ -105,17 +105,17 @@ Both contracts are verified on [Hashscan](https://hashscan.io). The escrow is a 
 
 ### Token approval
 
-HTS tokens do not support ERC-20 `approve()` through the Hedera JSON-RPC relay. Set allowances via the native Hedera SDK instead:
+ERC-20 `approve()` works for HTS tokens on Hedera but requires a higher gas limit than standard EVM chains. The SDK handles this automatically (`1_000_000n` gas for approve calls). If calling manually:
 
 ```ts
-import { AccountAllowanceApproveTransaction } from '@hashgraph/sdk'
-
-await new AccountAllowanceApproveTransaction()
-  .approveTokenAllowance(tokenId, ownerId, spenderId, amount)
-  .execute(client)
+await walletClient.writeContract({
+  address: usdcAddress,
+  abi: erc20Abi,
+  functionName: 'approve',
+  args: [spender, amount],
+  gas: 1_000_000n, // HTS precompile needs higher gas
+})
 ```
-
-The native allowance is fully respected by EVM `transferFrom` calls.
 
 ### Voucher signing
 
@@ -128,6 +128,7 @@ Hashio underestimates gas for transactions involving the HTS precompile. Set exp
 | Operation | Recommended gas |
 |---|---|
 | ERC-20 `transfer` | `500_000n` |
+| ERC-20 `approve` | `1_000_000n` |
 | `escrow.open` / `settle` / `close` | `1_500_000n` |
 | `associateSelf` | `2_000_000n` |
 

@@ -216,6 +216,7 @@ export function hederaSession(options: HederaSessionClientOptions) {
             abi: ERC20_ABI,
             functionName: 'approve',
             args: [escrowContract, deposit],
+            gas: 1_000_000n, // HTS precompile needs higher gas for approve
           });
           await publicClient.waitForTransactionReceipt({ hash: approveTx });
         }
