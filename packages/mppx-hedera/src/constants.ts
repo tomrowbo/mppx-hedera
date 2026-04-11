@@ -16,7 +16,7 @@ export const USDC_DECIMALS = 6;
 // ─── HederaStreamChannel escrow contract ───────────────────────────
 // UPDATED AFTER `forge create` DEPLOYMENT — placeholder until then
 export const HEDERA_STREAM_CHANNEL_TESTNET =
-  '0x0000000000000000000000000000000000000000' as const; // TODO: update after deploy
+  '0x8226214188f22B9ddA901fb9ac85781eA4500D83' as const; // Deployed 2026-04-11, Hedera 0.0.8596587
 export const HEDERA_STREAM_CHANNEL_MAINNET =
   '0x0000000000000000000000000000000000000000' as const;
 

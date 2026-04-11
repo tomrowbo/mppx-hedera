@@ -2,10 +2,10 @@
 pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std-1.15.0/src/Script.sol";
-import {AbstractStreamChannel} from "../src/AbstractStreamChannel.sol";
+import {HederaStreamChannel} from "../src/HederaStreamChannel.sol";
 
 /**
- * @notice Deployment script for AbstractStreamChannel.
+ * @notice Deployment script for HederaStreamChannel.
  *
  * Usage (testnet):
  *   export ABSTRACT_TESTNET_RPC=https://api.testnet.abs.xyz
@@ -19,19 +19,19 @@ import {AbstractStreamChannel} from "../src/AbstractStreamChannel.sol";
  *   See README.md — requires foundry-zksync or hardhat-zksync toolchain.
  *
  * Verification (via abscan):
- *   forge verify-contract <ADDRESS> AbstractStreamChannel \
+ *   forge verify-contract <ADDRESS> HederaStreamChannel \
  *     --rpc-url abstract_testnet \
  *     --etherscan-api-key $ABSCAN_API_KEY
  */
-contract DeployAbstractStreamChannel is Script {
+contract DeployHederaStreamChannel is Script {
     function run() external {
         console2.log("Deployer:", msg.sender);
         console2.log("Chain ID:", block.chainid);
 
         vm.startBroadcast();
 
-        AbstractStreamChannel escrow = new AbstractStreamChannel{salt: bytes32(0)}();
-        console2.log("AbstractStreamChannel deployed:", address(escrow));
+        HederaStreamChannel escrow = new HederaStreamChannel{salt: bytes32(0)}();
+        console2.log("HederaStreamChannel deployed:", address(escrow));
         console2.log("VOUCHER_TYPEHASH:", vm.toString(escrow.VOUCHER_TYPEHASH()));
         console2.log("Domain Separator:", vm.toString(escrow.domainSeparator()));
 

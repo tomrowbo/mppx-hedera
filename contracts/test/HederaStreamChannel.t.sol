@@ -2,8 +2,8 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std-1.15.0/src/Test.sol";
-import {AbstractStreamChannel} from "../src/AbstractStreamChannel.sol";
-import {IAbstractStreamChannel} from "../src/interfaces/IAbstractStreamChannel.sol";
+import {HederaStreamChannel} from "../src/HederaStreamChannel.sol";
+import {IHederaStreamChannel} from "../src/interfaces/IHederaStreamChannel.sol";
 import {IERC20} from "forge-std-1.15.0/src/interfaces/IERC20.sol";
 import {ERC20} from "solady-0.1.26/src/tokens/ERC20.sol";
 import {SignatureCheckerLib} from "solady-0.1.26/src/utils/SignatureCheckerLib.sol";
@@ -39,7 +39,7 @@ contract MockERC1271Wallet {
     }
 
     function openChannel(
-        AbstractStreamChannel escrow,
+        HederaStreamChannel escrow,
         address payee,
         address token,
         uint128 deposit,
@@ -49,7 +49,7 @@ contract MockERC1271Wallet {
         return escrow.open(payee, token, deposit, salt, authorizedSigner);
     }
 
-    function requestClose(AbstractStreamChannel escrow, bytes32 channelId) external {
+    function requestClose(HederaStreamChannel escrow, bytes32 channelId) external {
         escrow.requestClose(channelId);
     }
 
@@ -60,8 +60,8 @@ contract MockERC1271Wallet {
     }
 }
 
-contract AbstractStreamChannelTest is Test {
-    AbstractStreamChannel public escrow;
+contract HederaStreamChannelTest is Test {
+    HederaStreamChannel public escrow;
     MockERC20 public token;
     MockERC1271Wallet public smartWallet;
 
@@ -80,7 +80,7 @@ contract AbstractStreamChannelTest is Test {
         smartWalletOwnerKey = 0xB0B;
         smartWalletOwner = vm.addr(smartWalletOwnerKey);
 
-        escrow = new AbstractStreamChannel();
+        escrow = new HederaStreamChannel();
         token = new MockERC20();
         smartWallet = new MockERC1271Wallet(smartWalletOwner);
 
@@ -134,7 +134,7 @@ contract AbstractStreamChannelTest is Test {
 
         bytes32 channelId = _openChannel(deposit, salt);
 
-        IAbstractStreamChannel.Channel memory ch = escrow.getChannel(channelId);
+        IHederaStreamChannel.Channel memory ch = escrow.getChannel(channelId);
         assertEq(ch.payer, payer);
         assertEq(ch.payee, payee);
         assertEq(ch.token, address(token));
@@ -148,13 +148,13 @@ contract AbstractStreamChannelTest is Test {
 
     function test_Open_RevertZeroDeposit() public {
         vm.prank(payer);
-        vm.expectRevert(IAbstractStreamChannel.ZeroDeposit.selector);
+        vm.expectRevert(IHederaStreamChannel.ZeroDeposit.selector);
         escrow.open(payee, address(token), 0, bytes32(0), address(0));
     }
 
     function test_Open_RevertZeroPayee() public {
         vm.prank(payer);
-        vm.expectRevert(IAbstractStreamChannel.InvalidPayee.selector);
+        vm.expectRevert(IHederaStreamChannel.InvalidPayee.selector);
         escrow.open(address(0), address(token), 100e6, bytes32(0), address(0));
     }
 
@@ -169,7 +169,7 @@ contract AbstractStreamChannelTest is Test {
         _openChannel(100e6, salt);
         // Same salt → same channelId → should revert
         vm.prank(payer);
-        vm.expectRevert(IAbstractStreamChannel.ChannelAlreadyExists.selector);
+        vm.expectRevert(IHederaStreamChannel.ChannelAlreadyExists.selector);
         escrow.open(payee, address(token), 50e6, salt, address(0));
     }
 
@@ -185,7 +185,7 @@ contract AbstractStreamChannelTest is Test {
 
         assertEq(token.balanceOf(payee), payeeBefore + cumulative);
 
-        IAbstractStreamChannel.Channel memory ch = escrow.getChannel(channelId);
+        IHederaStreamChannel.Channel memory ch = escrow.getChannel(channelId);
         assertEq(ch.settled, cumulative);
         assertFalse(ch.finalized);
     }
@@ -213,7 +213,7 @@ contract AbstractStreamChannelTest is Test {
 
         // Same amount — should revert
         vm.prank(payee);
-        vm.expectRevert(IAbstractStreamChannel.AmountNotIncreasing.selector);
+        vm.expectRevert(IHederaStreamChannel.AmountNotIncreasing.selector);
         escrow.settle(channelId, 10e6, sig);
     }
 
@@ -233,7 +233,7 @@ contract AbstractStreamChannelTest is Test {
         vm.prank(payer);
         escrow.topUp(channelId, additional);
 
-        IAbstractStreamChannel.Channel memory ch = escrow.getChannel(channelId);
+        IHederaStreamChannel.Channel memory ch = escrow.getChannel(channelId);
         assertEq(ch.deposit, 75e6);
         assertEq(token.balanceOf(address(escrow)), 75e6);
     }
@@ -266,7 +266,7 @@ contract AbstractStreamChannelTest is Test {
 
         assertEq(token.balanceOf(payee), payeeBefore + cumulative);
 
-        IAbstractStreamChannel.Channel memory ch = escrow.getChannel(channelId);
+        IHederaStreamChannel.Channel memory ch = escrow.getChannel(channelId);
         assertEq(ch.payer, address(smartWallet));
         assertEq(ch.settled, cumulative);
         assertFalse(ch.finalized);
@@ -302,12 +302,12 @@ contract AbstractStreamChannelTest is Test {
         vm.prank(payer);
         escrow.requestClose(channelId);
 
-        IAbstractStreamChannel.Channel memory ch = escrow.getChannel(channelId);
+        IHederaStreamChannel.Channel memory ch = escrow.getChannel(channelId);
         assertGt(ch.closeRequestedAt, 0);
 
         // Try to withdraw immediately — should revert
         vm.prank(payer);
-        vm.expectRevert(IAbstractStreamChannel.CloseNotReady.selector);
+        vm.expectRevert(IHederaStreamChannel.CloseNotReady.selector);
         escrow.withdraw(channelId);
 
         // Fast-forward past grace period
@@ -335,7 +335,7 @@ contract AbstractStreamChannelTest is Test {
         ids[0] = id1;
         ids[1] = id2;
 
-        IAbstractStreamChannel.Channel[] memory channels = escrow.getChannelsBatch(ids);
+        IHederaStreamChannel.Channel[] memory channels = escrow.getChannelsBatch(ids);
         assertEq(channels[0].deposit, 10e6);
         assertEq(channels[1].deposit, 20e6);
     }

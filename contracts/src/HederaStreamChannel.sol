@@ -2,17 +2,17 @@
 pragma solidity ^0.8.20;
 
 import {IERC20} from "forge-std-1.15.0/src/interfaces/IERC20.sol";
-import {IAbstractStreamChannel} from "./interfaces/IAbstractStreamChannel.sol";
+import {IHederaStreamChannel} from "./interfaces/IHederaStreamChannel.sol";
 import {EIP712} from "solady-0.1.26/src/utils/EIP712.sol";
 import {SignatureCheckerLib} from "solady-0.1.26/src/utils/SignatureCheckerLib.sol";
 
 /**
- * @title AbstractStreamChannel
+ * @title HederaStreamChannel
  * @notice Unidirectional payment channel escrow for streaming payments on Abstract.
  * @dev Port of TempoStreamChannel.sol with the following changes:
  *      1. ITIP20 replaced with OpenZeppelin IERC20.
  *      2. TempoUtilities.isTIP20() replaced with `require(token != address(0))`.
- *      3. EIP-712 domain name changed to "Abstract Stream Channel".
+ *      3. EIP-712 domain name changed to "Hedera Stream Channel".
  *      4. All logic, function signatures, events, and errors are identical.
  *
  *      Users deposit ERC-20 tokens (e.g., USDC.e), sign cumulative vouchers
@@ -20,7 +20,7 @@ import {SignatureCheckerLib} from "solady-0.1.26/src/utils/SignatureCheckerLib.s
  *      Channels have no expiry — closed cooperatively by the server or after a
  *      grace period following a payer's requestClose().
  */
-contract AbstractStreamChannel is IAbstractStreamChannel, EIP712 {
+contract HederaStreamChannel is IHederaStreamChannel, EIP712 {
     // --- Constants ---
 
     bytes32 public constant VOUCHER_TYPEHASH = keccak256("Voucher(bytes32 channelId,uint128 cumulativeAmount)");
@@ -34,7 +34,7 @@ contract AbstractStreamChannel is IAbstractStreamChannel, EIP712 {
     // --- EIP-712 Domain ---
 
     function _domainNameAndVersion() internal pure override returns (string memory name, string memory version) {
-        name = "Abstract Stream Channel";
+        name = "Hedera Stream Channel";
         version = "1";
     }
 
@@ -367,5 +367,20 @@ contract AbstractStreamChannel is IAbstractStreamChannel, EIP712 {
     function _getVoucherDigest(bytes32 channelId, uint128 cumulativeAmount) internal view returns (bytes32) {
         bytes32 structHash = keccak256(abi.encode(VOUCHER_TYPEHASH, channelId, cumulativeAmount));
         return _hashTypedData(structHash);
+    }
+
+    // ─── HTS Self-Association (Hedera-specific) ────────────────────────
+    address constant HTS_PRECOMPILE = address(0x167);
+    int256 constant HTS_SUCCESS_CODE = 22;
+
+    /// @notice Associate this contract with an HTS token so it can receive transfers.
+    /// @dev Anyone can call. HTS precompile enforces address(this) is the account being associated.
+    function associateSelf(address token) external returns (int256 responseCode) {
+        (bool success, bytes memory result) = HTS_PRECOMPILE.call(
+            abi.encodeWithSignature("associateToken(address,address)", address(this), token)
+        );
+        require(success, "HTS precompile call failed");
+        responseCode = abi.decode(result, (int256));
+        require(responseCode == HTS_SUCCESS_CODE, "HTS associate rejected");
     }
 }

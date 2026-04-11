@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @title IAbstractStreamChannel
-/// @notice Interface for the AbstractStreamChannel escrow contract.
+/// @title IHederaStreamChannel
+/// @notice Interface for the HederaStreamChannel escrow contract.
 /// @dev Unidirectional payment channel for streaming payments using EIP-712 signed vouchers.
 ///      Backed by standard ERC-20 tokens (no TIP-20 / Tempo-specific interfaces required).
 ///      Direct port of ITempoStreamChannel with ITIP20 replaced by IERC20.
-interface IAbstractStreamChannel {
+interface IHederaStreamChannel {
     struct Channel {
         bool finalized;
         uint64 closeRequestedAt;
