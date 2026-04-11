@@ -1,8 +1,9 @@
 /**
  * Hedera chain constants for the mppx-hedera MPP plugin.
  *
- * USDC token: 0.0.5449 on testnet (long-zero EVM: 0x...1549), 6 decimals.
- * Escrow contract: deployed during hackathon build — address updated after forge deploy.
+ * Testnet USDC: 0.0.5449 (long-zero EVM: 0x...1549), 6 decimals
+ * Mainnet USDC: 0.0.456858 (long-zero EVM: 0x...06f89a), 6 decimals, Circle native
+ * Escrow contract: HederaStreamChannel.sol deployed on both networks.
  */
 
 import { hederaTestnet, hederaMainnet } from './internal.js';
@@ -18,7 +19,7 @@ export const USDC_DECIMALS = 6;
 export const HEDERA_STREAM_CHANNEL_TESTNET =
   '0x8226214188f22B9ddA901fb9ac85781eA4500D83' as const; // Deployed 2026-04-11, Hedera 0.0.8596587
 export const HEDERA_STREAM_CHANNEL_MAINNET =
-  '0x0000000000000000000000000000000000000000' as const;
+  '0x3cf652150A3f3CC768854dAb0c252E35eBd093A3' as const; // Deployed 2026-04-11, Hedera 0.0.10430540
 
 /** ABI for the HederaStreamChannel escrow contract. */
 export const HEDERA_STREAM_CHANNEL_ABI = [

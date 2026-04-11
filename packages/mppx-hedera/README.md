@@ -109,27 +109,18 @@ Three things work differently on Hedera vs standard EVM:
 
 ## Deployed contracts
 
-| Network | Escrow contract | USDC token |
-|---|---|---|
-| Testnet | [`0x8226214188f22B9ddA901fb9ac85781eA4500D83`](https://hashscan.io/testnet/contract/0x8226214188f22B9ddA901fb9ac85781eA4500D83) | `0x0000000000000000000000000000000000001549` (0.0.5449) |
-| Mainnet | Not yet deployed | `0x000000000000000000000000000000000006f89a` (0.0.456858) |
-
-## Go-to-Market
-
-1. Publish `mppx-hedera` to npm (MIT)
-2. Post in Hedera Discord #developers
-3. PR to `wevm/mppx` adding `hedera` as a named export
-4. Submit listing to mpp.dev payment methods directory
-5. Blog post: "Why Hedera Needed Native MPP"
-6. Apply for Hedera Foundation grant for mainnet deployment
+| Network | Escrow contract | USDC token | Chain ID |
+|---|---|---|---|
+| Testnet | [`0x8226214188f22B9ddA901fb9ac85781eA4500D83`](https://hashscan.io/testnet/contract/0x8226214188f22B9ddA901fb9ac85781eA4500D83) | `0x0000000000000000000000000000000000001549` (0.0.5449) | 296 |
+| Mainnet | [`0x3cf652150A3f3CC768854dAb0c252E35eBd093A3`](https://hashscan.io/mainnet/contract/0x3cf652150A3f3CC768854dAb0c252E35eBd093A3) | `0x000000000000000000000000000000000006f89a` (0.0.456858, Circle native) | 295 |
 
 ## Roadmap
 
 | Version | Features |
 |---|---|
-| **v0.1.0** | Charge + session intents, testnet (this release) |
-| v0.2.0 | Mainnet deployment, HCS audit trails |
-| v0.3.0 | Native `@hashgraph/sdk` client path, gasless via fee delegation |
+| **v0.1.0** | Charge + session intents, testnet + mainnet |
+| v0.2.0 | HCS audit trails, native `@hashgraph/sdk` client path |
+| v0.3.0 | Gasless via Hedera fee delegation |
 | v0.4.0 | PR to `wevm/mppx` core → listed on mpp.dev |
 
 ## Credits
