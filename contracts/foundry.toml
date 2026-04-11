@@ -6,6 +6,8 @@ solc_version = "0.8.26"
 evm_version = "shanghai"
 optimizer = true
 optimizer_runs = 200
+bytecode_hash = "none"
+cbor_metadata = false
 
 [rpc_endpoints]
 hedera_testnet = "https://testnet.hashio.io/api"
