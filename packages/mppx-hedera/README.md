@@ -96,8 +96,8 @@ The `402` challenge advertises all methods; the client uses whichever it support
 
 | Network | HederaStreamChannel | USDC | Chain ID |
 |---|---|---|---|
-| Testnet | [`0x2474...6e8`](https://hashscan.io/testnet/contract/0x2474912C56e686457C86e37980a75B4d3Aa8D6e8) | `0x...001549` (0.0.5449) | 296 |
-| Mainnet | [`0xb68B...2BF`](https://hashscan.io/mainnet/contract/0xb68B7d696DfBbB1cEE50D17083e0e5C18E0De2BF) | `0x...06f89a` (0.0.456858, Circle) | 295 |
+| Testnet | [`0x2474...6e8`](https://hashscan.io/testnet/contract/0xd5235aC832d606E8f1E0Aa40a675b54483F6fe43) | `0x...001549` (0.0.5449) | 296 |
+| Mainnet | [`0xb68B...2BF`](https://hashscan.io/mainnet/contract/0xAE27c6a54aD536a2De47B6B096Ca3FBcee738eFB) | `0x...06f89a` (0.0.456858, Circle) | 295 |
 
 Both contracts are verified on [Hashscan](https://hashscan.io). The escrow is a port of [Tempo's StreamChannel](https://github.com/tempoxyz/mpp-specs) via [@abstract-foundation/mpp](https://github.com/Abstract-Foundation/mpp-abstract), with the EIP-712 domain set to `"Hedera Stream Channel"`.
 
