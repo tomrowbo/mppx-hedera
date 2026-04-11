@@ -1,5 +1,5 @@
-export type { HederaChargeClientOptions } from './charge.js';
-export { hederaCharge } from './charge.js';
-export { chargeMethod, sessionMethod } from './methods.js';
-export type { HederaSessionClientOptions } from './session.js';
-export { hederaSession } from './session.js';
+export type { HederaChargeClientOptions } from './charge.ts';
+export { hederaCharge } from './charge.ts';
+export { chargeMethod, sessionMethod } from './methods.ts';
+export type { HederaSessionClientOptions } from './session.ts';
+export { hederaSession } from './session.ts';

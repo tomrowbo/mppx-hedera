@@ -19,9 +19,9 @@ import {
   encodeFunctionData,
   erc20Abi,
 } from 'viem';
-import { chargeMethod } from './methods.js';
-import { resolveChain } from '../internal.js';
-import { DEFAULT_CURRENCY } from '../constants.js';
+import { chargeMethod } from './methods.ts';
+import { resolveChain } from '../internal.ts';
+import { DEFAULT_CURRENCY } from '../constants.ts';
 
 export interface HederaChargeClientOptions {
   /** A viem WalletClient with an account attached (e.g. via privateKeyToAccount). */

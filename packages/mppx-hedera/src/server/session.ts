@@ -19,19 +19,17 @@ import {
   type WalletClient,
   zeroAddress,
 } from 'viem';
-import {
-  getGeneralPaymasterInput,
-import { sessionMethod } from '../client/methods.js';
+import { sessionMethod } from '../client/methods.ts';
 import {
   HEDERA_STREAM_CHANNEL_ABI,
   DEFAULT_CURRENCY,
   DEFAULT_ESCROW,
-  USDC_E_DECIMALS,
+  USDC_DECIMALS,
   VOUCHER_DOMAIN_NAME,
   VOUCHER_DOMAIN_VERSION,
   VOUCHER_TYPES,
-} from '../constants.js';
-import { assertUint128, resolveChain } from '../internal.js';
+} from '../constants.ts';
+import { assertUint128, resolveChain } from '../internal.ts';
 
 interface VoucherRecord {
   channelId: Hex;
@@ -127,10 +125,6 @@ export interface HederaSessionServerOptions {
   testnet?: boolean;
   /** Custom RPC URL. */
   rpcUrl?: string;
-  /** Optional paymaster address. */
-  paymasterAddress?: Address;
-  /** Optional custom input for the paymaster's logic. */
-  paymasterInput?: Hex;
   /** Store backend for channel state. Defaults to Store.memory(). */
   store?: Store.Store;
 }
@@ -216,11 +210,9 @@ export function session(params: HederaSessionServerOptions) {
     suggestedDeposit,
     minVoucherDelta = '0',
     unitType = 'request',
-    decimals = USDC_E_DECIMALS,
+    decimals = USDC_DECIMALS,
     testnet = false,
     rpcUrl,
-    paymasterAddress,
-    paymasterInput,
   } = params;
 
   const defaultChain = testnet ? hederaTestnet : hederaMainnet;
@@ -566,30 +558,14 @@ export function session(params: HederaSessionServerOptions) {
 
           const closeArgs = [channelId, cumulativeAmount, signature] as const;
 
-          let txHash: Hex;
-          if (paymasterAddress) {
-            txHash = await walletClient.writeContract({
-              account,
-              address: escrowContract,
-              abi: HEDERA_STREAM_CHANNEL_ABI,
-              functionName: 'close',
-              args: closeArgs,
-              ...{
-                paymaster: paymasterAddress,
-                paymasterInput: getGeneralPaymasterInput({
-                  innerInput: paymasterInput ?? '0x',
-                }),
-              },
-            });
-          } else {
-            txHash = await walletClient.writeContract({
-              account,
-              address: escrowContract,
-              abi: HEDERA_STREAM_CHANNEL_ABI,
-              functionName: 'close',
-              args: closeArgs,
-            });
-          }
+          const txHash = await walletClient.writeContract({
+            account,
+            address: escrowContract,
+            abi: HEDERA_STREAM_CHANNEL_ABI,
+            functionName: 'close',
+            args: closeArgs,
+            gas: 1_500_000n, // Hashio underestimates for HTS precompile calls
+          });
 
           const closeReceipt = await publicClient.waitForTransactionReceipt({
             hash: txHash,
