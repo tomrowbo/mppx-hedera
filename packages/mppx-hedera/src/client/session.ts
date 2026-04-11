@@ -90,7 +90,7 @@ interface ChannelEntry {
 }
 
 /**
- * Creates a client-side Abstract session payment method.
+ * Creates a client-side Hedera session payment method.
  *
  * Manages channel state in-memory across requests.
  *
