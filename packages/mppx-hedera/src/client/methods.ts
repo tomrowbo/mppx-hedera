@@ -6,7 +6,7 @@ import { Method, z } from 'mppx';
 import { parseUnits } from 'viem';
 
 /**
- * Abstract charge intent — one-time ERC-3009 transfer authorization.
+ * Hedera charge intent — one-time ERC-20 USDC transfer.
  *
  * The credential payload carries the ERC-3009 typed-data signature so the
  * server can call `transferWithAuthorization` on behalf of the payer.
@@ -46,7 +46,7 @@ export const chargeMethod = Method.from({
 });
 
 /**
- * Abstract session intent — payment channels backed by HederaStreamChannel.
+ * Hedera session intent — payment channels backed by HederaStreamChannel.
  */
 export const sessionMethod = Method.from({
   name: 'hedera',
