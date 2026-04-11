@@ -12,6 +12,8 @@
   "packageManager": "pnpm@9.0.0",
   "dependencies": {
     "@hashgraph/sdk": "^2.81.0",
-    "ethers": "^6.16.0"
+    "ethers": "^6.16.0",
+    "mppx": "^0.5.12",
+    "viem": "^2.47.12"
   }
 }
