@@ -1,323 +1,147 @@
 /**
- * Server-side charge method for the Hedera MPP payment method.
+ * mppx-hedera/server — charge intent verification
  *
- * Verifies an ERC-3009 TransferWithAuthorization signature and broadcasts
- * the `transferWithAuthorization` call to settle payment on-chain.
+ * Server-side: verifies that an ERC-20 transfer actually landed on Hedera
+ * with the correct amount, recipient, and token.
  *
- * When `paymasterAddress` is configured the transaction is submitted with
- * Hedera-native `customData.paymasterParams` — no external
- * fee-payer service required.
+ * Ported from @stablecoin.xyz/radius-mpp (MIT) with Hedera chain config,
+ * typed errors from mppx core, and Store-based idempotency.
  */
 
-import { Method } from 'mppx';
+import { Errors, Method, Receipt, Store } from 'mppx';
 import {
-  type Account,
-  type Address,
   createPublicClient,
-  createWalletClient,
-  erc20Abi,
-  type Hex,
   http,
-  parseSignature,
-  type PublicClient,
-  type Transport,
-  type WalletClient,
+  decodeEventLog,
+  erc20Abi,
+  type Log,
 } from 'viem';
-import {
-  getGeneralPaymasterInput,
 import { chargeMethod } from '../client/methods.js';
-import {
-  DEFAULT_CURRENCY,
-  ERC3009_ABI,
-  ERC3009_BYTES_SIGNATURE_ABI,
-  TRANSFER_WITH_AUTHORIZATION_TYPES,
-  USDC_E_DECIMALS,
-} from '../constants.js';
-import { resolveChain } from '../internal.js';
+import { resolveChain, DEFAULT_CURRENCY } from '../constants.js';
 
 export interface HederaChargeServerOptions {
-  /** Token address (defaults to USDC.e for the resolved chain). */
-  currency?: Address;
-  /** Decimals for amount conversion. Default 6. */
-  decimals?: number;
-  /** Server wallet that broadcasts transferWithAuthorization. */
-  account: Account;
-  /** Recipient address for collected payments. */
-  recipient: Address;
-  /** Human-readable default amount per request, e.g. "0.01". */
-  amount?: string;
-  /** If true, use Hedera testnet (chainId 11124). */
-  testnet?: boolean;
-  /** Optional custom RPC URL override. */
+  /** Override the RPC URL (defaults to the chain's Hashio endpoint). */
   rpcUrl?: string;
-  /**
-   * Optional fee payer contract address.
-   *
-   * When set, the `transferWithAuthorization` transaction is submitted with
-   * ZKsync-native `customData.paymasterParams` — gas is sponsored by the
-   * paymaster. No external fee-payer service is required.
-   *
-   * @example
-   * ```ts
-   * hedera.charge({
-   *   paymasterAddress: '0x...', // fee delegation via @hashgraph/sdk
-   *   paymasterInput: '0x...', // optional custom input for your paymaster's logic
-   *   ...
-   * })
-   * ```
-   */
-  paymasterAddress?: Address;
-  /** Optional custom input for the paymaster's logic. */
-  paymasterInput?: Hex;
-}
-
-/** Per-currency ERC-3009 domain cache to avoid redundant RPC calls. */
-const domainCache = new Map<string, { name: string; version: string }>();
-
-function isCompactSignature(signature: Hex): boolean {
-  return (signature.length - 2) / 2 === 65;
-}
-
-async function getErc3009Domain(
-  publicClient: PublicClient,
-  currency: Address,
-  chainId: number,
-) {
-  const cached = domainCache.get(currency);
-  if (cached) return { ...cached, chainId, verifyingContract: currency };
-
-  let name = 'USD Coin';
-  let version = '2';
-
-  try {
-    name = (await publicClient.readContract({
-      address: currency,
-      abi: erc20Abi,
-      functionName: 'name',
-    })) as string;
-  } catch {
-    /* fallback */
-  }
-
-  try {
-    version = (await publicClient.readContract({
-      address: currency,
-      abi: ERC3009_ABI,
-      functionName: 'version',
-    })) as string;
-  } catch {
-    /* fallback */
-  }
-
-  domainCache.set(currency, { name, version });
-  return { name, version, chainId, verifyingContract: currency };
+  /** Number of confirmations to require. Defaults to 1. */
+  confirmations?: number;
+  /** Pluggable store for idempotency. Defaults to in-memory. */
+  store?: Store.Store;
 }
 
 /**
- * Creates a server-side Hedera charge handler using Method.toServer().
- *
- * @example
- * ```ts
- * import { Mppx } from 'mppx/server'
- * import { hedera } from 'mppx-hedera/server'
- *
- * const mppx = Mppx.create({
- *   methods: [hedera.charge({
- *     account: serverAccount,
- *     recipient: '0x...',
- *     amount: '0.01',
- *     testnet: true,
- *   })],
- *   secretKey: process.env.MPP_SECRET_KEY!,
- *   realm: 'api.example.com',
- * })
- * ```
+ * Creates a server-side Hedera charge handler that verifies ERC-20 Transfer
+ * events from the tx receipt. No facilitator — reads Hashio directly.
  */
-export function charge(params: HederaChargeServerOptions) {
-  const {
-    account,
-    recipient,
-    amount,
-    decimals = USDC_E_DECIMALS,
-    testnet = false,
-    rpcUrl,
-    paymasterAddress,
-    paymasterInput,
-  } = params;
-
-  const defaultChain = testnet ? hederaTestnet : hederaMainnet;
-  const currency = params.currency ?? DEFAULT_CURRENCY[defaultChain.id];
-
-  function buildClients(chainId: number): {
-  } {
-    const chain = resolveChain(chainId);
-    const transport = http(rpcUrl);
-    return {
-      publicClient: createPublicClient({ chain, transport }),
-      walletClient: createWalletClient({ account, chain, transport }).extend(
-      ),
-    };
-  }
+export function charge(config: HederaChargeServerOptions = {}) {
+  const { confirmations = 1 } = config;
+  const store = config.store ?? Store.memory();
 
   return Method.toServer(chargeMethod, {
-    defaults: {
-      amount: amount ?? '0',
-      currency,
-      decimals,
-      recipient,
-    } as Record<string, unknown>,
+    async verify({ credential }) {
+      const { txHash } = credential.payload;
+      const { amount, chainId, recipient, payer } = credential.challenge.request;
+      const token = credential.challenge.request.token ?? DEFAULT_CURRENCY[chainId];
 
-    async request({ request }) {
-      return { ...request, chainId: request.chainId ?? defaultChain.id };
-    },
+      const chain = resolveChain(chainId);
+      const rpcUrl = config.rpcUrl ?? chain.rpcUrls.default.http[0];
+      const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
 
-    async verify({
-      credential,
-      request,
-    }: {
-      credential: Record<string, unknown>;
-      request: Record<string, unknown>;
-    }) {
-      const chainId =
-        (request.chainId as number | undefined) ?? defaultChain.id;
-      const { publicClient, walletClient } = buildClients(chainId);
-
-      const payload = credential.payload as Record<string, unknown>;
-      const challenge = credential.challenge as Record<string, unknown>;
-      const challengeReq = challenge.request as Record<string, unknown>;
-
-      const amountRaw = challengeReq.amount as string;
-      const currencyAddr =
-        (challengeReq.currency as Address | undefined) ?? currency;
-      const recipientAddr =
-        (challengeReq.recipient as Address | undefined) ?? recipient;
-
-      if (payload.type !== 'authorization') {
-        throw new Error(`Unsupported credential type "${payload.type}"`);
+      // Idempotency: reject tx reuse
+      const storeKey = `hedera:charge:${txHash}`;
+      const seen = await store.get(storeKey);
+      if (seen !== null) {
+        throw new Errors.VerificationFailedError({
+          reason: 'Transaction hash already used',
+        });
       }
 
-      const signature = payload.signature as Hex;
-      const nonce = payload.nonce as Hex;
-      const validAfter = payload.validAfter as string;
-      const validBefore = payload.validBefore as string;
-      const from = payload.from as Address;
+      // Fetch the receipt via Hashio JSON-RPC
+      const receipt = await publicClient.getTransactionReceipt({
+        hash: txHash as `0x${string}`,
+      });
 
-      const domain = await getErc3009Domain(
-        publicClient,
-        currencyAddr,
-        chainId,
+      if (receipt.status !== 'success') {
+        throw new Errors.VerificationFailedError({
+          reason: `Transaction reverted on-chain (status: ${receipt.status})`,
+        });
+      }
+
+      // Optional payer check
+      if (payer && receipt.from.toLowerCase() !== payer.toLowerCase()) {
+        throw new Errors.VerificationFailedError({
+          reason: `Transaction sender ${receipt.from} does not match expected payer ${payer}`,
+        });
+      }
+
+      // Verify the tx was sent to the correct token contract
+      if (receipt.to?.toLowerCase() !== token?.toLowerCase()) {
+        throw new Errors.VerificationFailedError({
+          reason: `Transaction target ${receipt.to} does not match expected token ${token}`,
+        });
+      }
+
+      // Find the ERC-20 Transfer event matching recipient + amount
+      const transferLog = findMatchingTransferLog(
+        receipt.logs,
+        token!,
+        recipient,
+        BigInt(amount),
       );
 
-      const verified = await publicClient.verifyTypedData({
-        address: from,
-        domain,
-        types: TRANSFER_WITH_AUTHORIZATION_TYPES,
-        primaryType: 'TransferWithAuthorization',
-        message: {
-          from,
-          to: recipientAddr,
-          value: BigInt(amountRaw),
-          validAfter: BigInt(validAfter),
-          validBefore: BigInt(validBefore),
-          nonce,
-        },
-        signature,
-      });
-
-      if (!verified) {
-        throw new Error('ERC-3009 signature verification failed');
-      }
-
-      const used = (await publicClient.readContract({
-        address: currencyAddr,
-        abi: ERC3009_ABI,
-        functionName: 'authorizationState',
-        args: [from, nonce],
-      })) as boolean;
-
-      if (used) throw new Error('ERC-3009 authorization nonce already used');
-
-      const baseArgs = [
-        from,
-        recipientAddr,
-        BigInt(amountRaw),
-        BigInt(validAfter),
-        BigInt(validBefore),
-        nonce,
-      ] as const;
-      const signerCode = await publicClient.getCode({ address: from });
-      const isContractAccount = !!signerCode && signerCode !== '0x';
-
-      let txHash: Hex;
-
-      if (!isContractAccount && isCompactSignature(signature)) {
-        const parsed = parseSignature(signature);
-        if (!('v' in parsed)) {
-          throw new Error('Expected a 65-byte ECDSA signature');
-        }
-        const txArgs = [...baseArgs, Number(parsed.v), parsed.r, parsed.s] as const;
-
-        if (paymasterAddress) {
-          txHash = await walletClient.writeContract({
-            account,
-            address: currencyAddr,
-            abi: ERC3009_ABI,
-            functionName: 'transferWithAuthorization',
-            args: txArgs,
-            ...{
-              paymaster: paymasterAddress,
-              paymasterInput: getGeneralPaymasterInput({
-                innerInput: paymasterInput ?? '0x',
-              }),
-            },
-          });
-        } else {
-          txHash = await walletClient.writeContract({
-            account,
-            address: currencyAddr,
-            abi: ERC3009_ABI,
-            functionName: 'transferWithAuthorization',
-            args: txArgs,
-          });
-        }
-      } else if (paymasterAddress) {
-        txHash = await walletClient.writeContract({
-          account,
-          address: currencyAddr,
-          abi: ERC3009_BYTES_SIGNATURE_ABI,
-          functionName: 'transferWithAuthorization',
-          args: [...baseArgs, signature],
-          ...{
-            paymaster: paymasterAddress,
-            paymasterInput: getGeneralPaymasterInput({
-              innerInput: paymasterInput ?? '0x',
-            }),
-          },
-        });
-      } else {
-        txHash = await walletClient.writeContract({
-          account,
-          address: currencyAddr,
-          abi: ERC3009_BYTES_SIGNATURE_ABI,
-          functionName: 'transferWithAuthorization',
-          args: [...baseArgs, signature],
+      if (!transferLog) {
+        throw new Errors.VerificationFailedError({
+          reason: `No matching ERC-20 Transfer event found for recipient ${recipient} with amount ${amount}`,
         });
       }
 
-      const receipt = await publicClient.waitForTransactionReceipt({
-        hash: txHash,
-      });
-      if (receipt.status !== 'success') {
-        throw new Error(`transferWithAuthorization reverted: ${txHash}`);
+      // Wait for additional confirmations if configured
+      if (confirmations > 1) {
+        await publicClient.waitForTransactionReceipt({
+          hash: txHash as `0x${string}`,
+          confirmations,
+        });
       }
 
-      return {
-        method: 'hedera' as const,
-        intent: 'charge' as const,
-        status: 'success' as const,
-        timestamp: new Date().toISOString(),
+      // Mark as used
+      await store.set(storeKey, Date.now());
+
+      return Receipt.from({
+        method: 'hedera',
         reference: txHash,
-      };
+        status: 'success',
+        timestamp: new Date().toISOString(),
+      });
     },
   });
+}
+
+// ─── Helpers ───────────────────────────────────────────────────────
+
+function findMatchingTransferLog(
+  logs: Log[],
+  token: string,
+  recipient: string,
+  minAmount: bigint,
+) {
+  for (const log of logs) {
+    if (log.address.toLowerCase() !== token.toLowerCase()) continue;
+    try {
+      const decoded = decodeEventLog({
+        abi: erc20Abi,
+        data: log.data,
+        topics: log.topics,
+      });
+      if (decoded.eventName !== 'Transfer') continue;
+      const { to, value } = decoded.args as { to: `0x${string}`; value: bigint };
+      if (
+        to.toLowerCase() === recipient.toLowerCase() &&
+        value >= minAmount
+      ) {
+        return { to, value };
+      }
+    } catch {
+      continue;
+    }
+  }
+  return null;
 }
