@@ -8,7 +8,7 @@ import {SignatureCheckerLib} from "solady-0.1.26/src/utils/SignatureCheckerLib.s
 
 /**
  * @title HederaStreamChannel
- * @notice Unidirectional payment channel escrow for streaming payments on Abstract.
+ * @notice Unidirectional payment channel escrow for streaming payments on Hedera.
  * @dev Port of TempoStreamChannel.sol with the following changes:
  *      1. ITIP20 replaced with OpenZeppelin IERC20.
  *      2. TempoUtilities.isTIP20() replaced with `require(token != address(0))`.
