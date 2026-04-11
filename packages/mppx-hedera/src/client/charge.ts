@@ -8,7 +8,7 @@
  * Uses plain ERC-20 transfer() — not ERC-3009 (HTS tokens don't support it).
  */
 
-import { Credential, type Method } from 'mppx';
+import { Credential, Method } from 'mppx';
 import {
   createPublicClient,
   http,
@@ -19,9 +19,9 @@ import {
   encodeFunctionData,
   erc20Abi,
 } from 'viem';
-import { chargeMethod } from './methods.ts';
-import { resolveChain } from '../internal.ts';
-import { DEFAULT_CURRENCY } from '../constants.ts';
+import { chargeMethod } from './methods.js';
+import { resolveChain } from '../internal.js';
+import { DEFAULT_CURRENCY } from '../constants.js';
 
 export interface HederaChargeClientOptions {
   /** A viem WalletClient with an account attached (e.g. via privateKeyToAccount). */
@@ -39,8 +39,10 @@ export function charge(config: HederaChargeClientOptions) {
 
   return Method.toClient(chargeMethod, {
     async createCredential({ challenge }) {
-      const { amount, chainId, recipient } = challenge.request;
-      const token = challenge.request.token ?? DEFAULT_CURRENCY[chainId];
+      const req = challenge.request as any;
+      const chainId = req.methodDetails?.chainId ?? 296;
+      const { amount, recipient } = req;
+      const token = req.token ?? DEFAULT_CURRENCY[chainId];
       if (!token) throw new Error(`No USDC token configured for chainId ${chainId}`);
 
       const chain = resolveChain(chainId);

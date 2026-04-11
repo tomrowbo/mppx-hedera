@@ -29,9 +29,9 @@ import {
   VOUCHER_DOMAIN_NAME,
   VOUCHER_DOMAIN_VERSION,
   VOUCHER_TYPES,
-} from '../constants.ts';
-import { randomBytes32, resolveChain } from '../internal.ts';
-import { sessionMethod } from './methods.ts';
+} from '../constants.js';
+import { randomBytes32, resolveChain } from '../internal.js';
+import { sessionMethod } from './methods.js';
 
 const ERC20_ABI = [
   {

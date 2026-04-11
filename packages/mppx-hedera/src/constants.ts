@@ -5,7 +5,7 @@
  * Escrow contract: deployed during hackathon build — address updated after forge deploy.
  */
 
-import { hederaTestnet, hederaMainnet } from './internal.ts';
+import { hederaTestnet, hederaMainnet } from './internal.js';
 
 // ─── USDC on Hedera (HTS token exposed as ERC-20 via HIP-218) ─────
 // Using 0.0.5449 (testnet USDC, 212 USDC available, verified 2026-04-11)
