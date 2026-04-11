@@ -6,10 +6,10 @@
  */
 
 // Schemas (shared between client + server)
-export { chargeMethod, sessionMethod } from './client/methods.js';
+export { chargeMethod, sessionMethod } from './client/methods.ts';
 
 // Chain definitions
-export { hederaTestnet, hederaMainnet } from './internal.js';
+export { hederaTestnet, hederaMainnet } from './internal.ts';
 
 // Constants
 export {
@@ -24,4 +24,4 @@ export {
   VOUCHER_DOMAIN_VERSION,
   VOUCHER_TYPES,
   HEDERA_STREAM_CHANNEL_ABI,
-} from './constants.js';
+} from './constants.ts';

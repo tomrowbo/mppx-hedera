@@ -16,9 +16,9 @@ import {
   erc20Abi,
   type Log,
 } from 'viem';
-import { chargeMethod } from '../client/methods.js';
-import { resolveChain } from '../internal.js';
-import { DEFAULT_CURRENCY } from '../constants.js';
+import { chargeMethod } from '../client/methods.ts';
+import { resolveChain } from '../internal.ts';
+import { DEFAULT_CURRENCY } from '../constants.ts';
 
 export interface HederaChargeServerOptions {
   /** Override the RPC URL (defaults to the chain's Hashio endpoint). */
