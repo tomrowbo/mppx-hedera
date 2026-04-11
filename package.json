@@ -1,0 +1,12 @@
+{
+  "name": "mppx-hedera-monorepo",
+  "private": true,
+  "type": "module",
+  "workspaces": ["packages/*", "apps/*"],
+  "scripts": {
+    "dev": "pnpm --filter demo dev",
+    "build": "pnpm -r build",
+    "test": "pnpm --filter mppx-hedera test"
+  },
+  "packageManager": "pnpm@9.0.0"
+}

@@ -1,0 +1,39 @@
+# Build artifacts
+node_modules/
+dist/
+build/
+out/
+cache/
+dependencies/
+.next/
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# OS
+.DS_Store
+*.log
+
+# IDE
+.vscode/
+.idea/
+.turbo/
+coverage/
+
+# Planning docs (internal only, not in submission repo)
+docs/
+phoebe/
+scratch/
+reference/
+
+# Foundry cache
+contracts/out/
+contracts/cache/
+contracts/dependencies/
+
+# Root planning files (internal only)
+BRIEF.md
+CHECKLIST.md
+PLAN.md
