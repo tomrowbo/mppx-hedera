@@ -1,11 +1,11 @@
 /**
- * Server-side charge method for the Abstract MPP payment method.
+ * Server-side charge method for the Hedera MPP payment method.
  *
  * Verifies an ERC-3009 TransferWithAuthorization signature and broadcasts
  * the `transferWithAuthorization` call to settle payment on-chain.
  *
  * When `paymasterAddress` is configured the transaction is submitted with
- * Abstract's ZKsync-native `customData.paymasterParams` — no external
+ * Hedera-native `customData.paymasterParams` — no external
  * fee-payer service required.
  */
 
@@ -46,12 +46,12 @@ export interface HederaChargeServerOptions {
   recipient: Address;
   /** Human-readable default amount per request, e.g. "0.01". */
   amount?: string;
-  /** If true, use Abstract testnet (chainId 11124). */
+  /** If true, use Hedera testnet (chainId 11124). */
   testnet?: boolean;
   /** Optional custom RPC URL override. */
   rpcUrl?: string;
   /**
-   * Optional Abstract paymaster contract address.
+   * Optional fee payer contract address.
    *
    * When set, the `transferWithAuthorization` transaction is submitted with
    * ZKsync-native `customData.paymasterParams` — gas is sponsored by the
@@ -59,8 +59,8 @@ export interface HederaChargeServerOptions {
    *
    * @example
    * ```ts
-   * abstract.charge({
-   *   paymasterAddress: '0x...', // your Abstract paymaster contract
+   * hedera.charge({
+   *   paymasterAddress: '0x...', // fee delegation via @hashgraph/sdk
    *   paymasterInput: '0x...', // optional custom input for your paymaster's logic
    *   ...
    * })
@@ -114,15 +114,15 @@ async function getErc3009Domain(
 }
 
 /**
- * Creates a server-side Abstract charge handler using Method.toServer().
+ * Creates a server-side Hedera charge handler using Method.toServer().
  *
  * @example
  * ```ts
  * import { Mppx } from 'mppx/server'
- * import { abstract } from '@abstract-foundation/mpp/server'
+ * import { hedera } from 'mppx-hedera/server'
  *
  * const mppx = Mppx.create({
- *   methods: [abstract.charge({
+ *   methods: [hedera.charge({
  *     account: serverAccount,
  *     recipient: '0x...',
  *     amount: '0.01',
@@ -145,7 +145,7 @@ export function charge(params: HederaChargeServerOptions) {
     paymasterInput,
   } = params;
 
-  const defaultChain = testnet ? abstractTestnet : abstract;
+  const defaultChain = testnet ? hederaTestnet : hederaMainnet;
   const currency = params.currency ?? DEFAULT_CURRENCY[defaultChain.id];
 
   function buildClients(chainId: number): {

@@ -1,7 +1,7 @@
 /**
- * Client-side session credential creator for the Abstract MPP payment method.
+ * Client-side session credential creator for the Hedera MPP payment method.
  *
- * Session payments use AbstractStreamChannel.sol — an ERC-20/EIP-712 payment
+ * Session payments use HederaStreamChannel.sol — an ERC-20/EIP-712 payment
  * channel where:
  *   - `open`: client approves + calls escrow.open(), then signs a voucher
  *   - `voucher`: client signs a new cumulative voucher for each request
@@ -24,7 +24,7 @@ import {
   zeroAddress,
 } from 'viem';
 import {
-  ABSTRACT_STREAM_CHANNEL_ABI,
+  HEDERA_STREAM_CHANNEL_ABI,
   DEFAULT_ESCROW,
   VOUCHER_DOMAIN_NAME,
   VOUCHER_DOMAIN_VERSION,
@@ -100,7 +100,7 @@ interface ChannelEntry {
  *
  * @example
  * ```ts
- * import { hederaSession } from '@abstract-foundation/mpp/client'
+ * import { hederaSession } from 'mppx-hedera/client'
  * import { privateKeyToAccount } from 'viem/accounts'
  *
  * const session = hederaSession({
@@ -179,7 +179,7 @@ export function hederaSession(options: HederaSessionClientOptions) {
         (DEFAULT_ESCROW as Record<number, Address>)[chainId];
       if (!escrowContract) {
         throw new Error(
-          'escrowContract required: set options.escrowContract, ensure the server challenge includes methodDetails.escrowContract, or use a supported Abstract chain',
+          'escrowContract required: set options.escrowContract, ensure the server challenge includes methodDetails.escrowContract, or use a supported Hedera chain',
         );
       }
 
@@ -226,7 +226,7 @@ export function hederaSession(options: HederaSessionClientOptions) {
         const openTx = await walletClient.writeContract({
           account,
           address: escrowContract,
-          abi: ABSTRACT_STREAM_CHANNEL_ABI,
+          abi: HEDERA_STREAM_CHANNEL_ABI,
           functionName: 'open',
           args: [
             recipient,
@@ -240,7 +240,7 @@ export function hederaSession(options: HederaSessionClientOptions) {
 
         const channelId = (await publicClient.readContract({
           address: escrowContract,
-          abi: ABSTRACT_STREAM_CHANNEL_ABI,
+          abi: HEDERA_STREAM_CHANNEL_ABI,
           functionName: 'computeChannelId',
           args: [
             account.address as Address,

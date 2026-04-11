@@ -1,94 +1,27 @@
 /**
- * Abstract chain constants for the MPP plugin.
+ * Hedera chain constants for the mppx-hedera MPP plugin.
+ *
+ * USDC token: 0.0.5449 on testnet (long-zero EVM: 0x...1549), 6 decimals.
+ * Escrow contract: deployed during hackathon build — address updated after forge deploy.
  */
 
-/** USDC.e on Abstract Testnet (ERC-3009, 6 decimals) */
-export const USDC_E_TESTNET =
-  '0xbd28Bd5A3Ef540d1582828CE2A1a657353008C61' as const;
-/** USDC.e on Abstract Mainnet (ERC-3009, 6 decimals) */
-export const USDC_E_MAINNET =
-  '0x84A71ccD554Cc1b02749b35d22F684CC8ec987e1' as const;
+import { hederaTestnet, hederaMainnet } from './internal.js';
 
-/** USDC.e decimals */
-export const USDC_E_DECIMALS = 6;
+// ─── USDC on Hedera (HTS token exposed as ERC-20 via HIP-218) ─────
+// Using 0.0.5449 (testnet USDC, 212 USDC available, verified 2026-04-11)
+export const USDC_TESTNET = '0x0000000000000000000000000000000000001549' as const; // 0.0.5449
+export const USDC_MAINNET = '0x000000000000000000000000000000000006f89a' as const; // 0.0.456858
+export const USDC_DECIMALS = 6;
 
-/** AbstractStreamChannel escrow contract on Abstract Testnet. */
-export const ABSTRACT_STREAM_CHANNEL_TESTNET =
-  '0x29635C384f451a72ED2e2a312BCeb8b0bDC0923c' as const;
-/** AbstractStreamChannel escrow contract on Abstract Mainnet. */
-export const ABSTRACT_STREAM_CHANNEL_MAINNET =
-  '0x29635C384f451a72ED2e2a312BCeb8b0bDC0923c' as const;
+// ─── HederaStreamChannel escrow contract ───────────────────────────
+// UPDATED AFTER `forge create` DEPLOYMENT — placeholder until then
+export const HEDERA_STREAM_CHANNEL_TESTNET =
+  '0x0000000000000000000000000000000000000000' as const; // TODO: update after deploy
+export const HEDERA_STREAM_CHANNEL_MAINNET =
+  '0x0000000000000000000000000000000000000000' as const;
 
-/** Keccak-256 typehash for ERC-3009 `TransferWithAuthorization`. */
-export const TRANSFER_WITH_AUTHORIZATION_TYPEHASH =
-  '0x7c7c6cdb67a18743f49ec6fa9b35f50d52ed05cbed4cc592e13b44501c1a2267' as const;
-
-/** ABI fragments for ERC-3009 `transferWithAuthorization` (v/r/s signature variant). */
-export const ERC3009_ABI = [
-  {
-    name: 'transferWithAuthorization',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'from', type: 'address' },
-      { name: 'to', type: 'address' },
-      { name: 'value', type: 'uint256' },
-      { name: 'validAfter', type: 'uint256' },
-      { name: 'validBefore', type: 'uint256' },
-      { name: 'nonce', type: 'bytes32' },
-      { name: 'v', type: 'uint8' },
-      { name: 'r', type: 'bytes32' },
-      { name: 's', type: 'bytes32' },
-    ],
-    outputs: [],
-  },
-  {
-    name: 'authorizationState',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [
-      { name: 'authorizer', type: 'address' },
-      { name: 'nonce', type: 'bytes32' },
-    ],
-    outputs: [{ name: 'state', type: 'bool' }],
-  },
-  {
-    name: 'name',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'string' }],
-  },
-  {
-    name: 'version',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [],
-    outputs: [{ name: '', type: 'string' }],
-  },
-] as const;
-
-/** ABI fragment for ERC-3009 `transferWithAuthorization` (bytes signature variant). */
-export const ERC3009_BYTES_SIGNATURE_ABI = [
-  {
-    name: 'transferWithAuthorization',
-    type: 'function',
-    stateMutability: 'nonpayable',
-    inputs: [
-      { name: 'from', type: 'address' },
-      { name: 'to', type: 'address' },
-      { name: 'value', type: 'uint256' },
-      { name: 'validAfter', type: 'uint256' },
-      { name: 'validBefore', type: 'uint256' },
-      { name: 'nonce', type: 'bytes32' },
-      { name: 'signature', type: 'bytes' },
-    ],
-    outputs: [],
-  },
-] as const;
-
-/** ABI for the AbstractStreamChannel escrow contract. */
-export const ABSTRACT_STREAM_CHANNEL_ABI = [
+/** ABI for the HederaStreamChannel escrow contract. */
+export const HEDERA_STREAM_CHANNEL_ABI = [
   {
     name: 'open',
     type: 'function',
@@ -264,7 +197,7 @@ export const ABSTRACT_STREAM_CHANNEL_ABI = [
 ] as const;
 
 /** EIP-712 domain name for session voucher signatures. */
-export const VOUCHER_DOMAIN_NAME = 'Abstract Stream Channel';
+export const VOUCHER_DOMAIN_NAME = 'Hedera Stream Channel';
 /** EIP-712 domain version for session voucher signatures. */
 export const VOUCHER_DOMAIN_VERSION = '1';
 
@@ -288,14 +221,14 @@ export const TRANSFER_WITH_AUTHORIZATION_TYPES = {
   ],
 } as const;
 
-/** USDC.e address by Abstract chainId (testnet/mainnet). */
-export const DEFAULT_CURRENCY = {
-  [abstractTestnet.id]: USDC_E_TESTNET,
-  [abstract.id]: USDC_E_MAINNET,
+/** USDC address by Hedera chainId (testnet/mainnet). */
+export const DEFAULT_CURRENCY: Record<number, `0x${string}`> = {
+  [hederaTestnet.id]: USDC_TESTNET,
+  [hederaMainnet.id]: USDC_MAINNET,
 };
 
-/** AbstractStreamChannel address by Abstract chainId (testnet/mainnet). */
-export const DEFAULT_ESCROW = {
-  [abstractTestnet.id]: ABSTRACT_STREAM_CHANNEL_TESTNET,
-  [abstract.id]: ABSTRACT_STREAM_CHANNEL_MAINNET,
+/** HederaStreamChannel escrow address by Hedera chainId (testnet/mainnet). */
+export const DEFAULT_ESCROW: Record<number, `0x${string}`> = {
+  [hederaTestnet.id]: HEDERA_STREAM_CHANNEL_TESTNET,
+  [hederaMainnet.id]: HEDERA_STREAM_CHANNEL_MAINNET,
 };

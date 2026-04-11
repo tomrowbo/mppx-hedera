@@ -1,25 +1,27 @@
 /**
- * @abstract-foundation/mpp — MPP payment method plugin for Abstract chain.
+ * mppx-hedera — Native Machine Payments Protocol method for Hedera.
+ *
+ * Forked from @abstract-foundation/mpp (MIT) with charge layer ported
+ * from @stablecoin.xyz/radius-mpp (MIT). Both credited in README.
  */
 
-export type {
-  HederaChargeClientOptions,
-  HederaSessionClientOptions,
-} from './client/index.js';
+// Schemas (shared between client + server)
+export { chargeMethod, sessionMethod } from './client/methods.js';
 
+// Chain definitions
+export { hederaTestnet, hederaMainnet } from './internal.js';
+
+// Constants
 export {
-  hederaCharge as clientCharge,
-  chargeMethod,
-  hederaSession as clientSession,
-  sessionMethod,
-} from './client/index.js';
-export * from './constants.js';
-export type {
-  HederaChargeServerOptions,
-  HederaSessionServerOptions,
-} from './server/index.js';
-export {
-  abstract,
-  charge as serverCharge,
-  session as serverSession,
-} from './server/index.js';
+  USDC_TESTNET,
+  USDC_MAINNET,
+  USDC_DECIMALS,
+  HEDERA_STREAM_CHANNEL_TESTNET,
+  HEDERA_STREAM_CHANNEL_MAINNET,
+  DEFAULT_CURRENCY,
+  DEFAULT_ESCROW,
+  VOUCHER_DOMAIN_NAME,
+  VOUCHER_DOMAIN_VERSION,
+  VOUCHER_TYPES,
+  HEDERA_STREAM_CHANNEL_ABI,
+} from './constants.js';

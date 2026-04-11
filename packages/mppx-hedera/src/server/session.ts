@@ -1,7 +1,7 @@
 /**
- * Server-side session method for the Abstract MPP payment method.
+ * Server-side session method for the Hedera MPP payment method.
  *
- * Handles the full channel lifecycle against AbstractStreamChannel.sol.
+ * Handles the full channel lifecycle against HederaStreamChannel.sol.
  */
 
 import { Errors, Method, Store } from 'mppx';
@@ -23,7 +23,7 @@ import {
   getGeneralPaymasterInput,
 import { sessionMethod } from '../client/methods.js';
 import {
-  ABSTRACT_STREAM_CHANNEL_ABI,
+  HEDERA_STREAM_CHANNEL_ABI,
   DEFAULT_CURRENCY,
   DEFAULT_ESCROW,
   USDC_E_DECIMALS,
@@ -111,7 +111,7 @@ export interface HederaSessionServerOptions {
   recipient: Address;
   /** Token address (defaults to USDC.e for the chain). */
   currency?: Address;
-  /** AbstractStreamChannel escrow contract address. Defaults to the canonical deployment. */
+  /** HederaStreamChannel escrow contract address. Defaults to the canonical deployment. */
   escrowContract?: Address;
   /** Per-request payment amount (human-readable, e.g. "0.001"). */
   amount?: string;
@@ -187,15 +187,15 @@ function makeSessionReceipt(params: {
 }
 
 /**
- * Creates a server-side Abstract session handler.
+ * Creates a server-side Hedera session handler.
  *
  * @example
  * ```ts
  * import { Mppx } from 'mppx/server'
- * import { abstract } from '@abstract-foundation/mpp/server'
+ * import { hedera } from 'mppx-hedera/server'
  *
  * const mppx = Mppx.create({
- *   methods: [abstract.session({
+ *   methods: [hedera.session({
  *     account: serverAccount,
  *     recipient: '0x...',
  *     escrowContract: '0x...',
@@ -223,7 +223,7 @@ export function session(params: HederaSessionServerOptions) {
     paymasterInput,
   } = params;
 
-  const defaultChain = testnet ? abstractTestnet : abstract;
+  const defaultChain = testnet ? hederaTestnet : hederaMainnet;
   const escrowContract = params.escrowContract ?? DEFAULT_ESCROW[defaultChain.id];
   const currency = params.currency ?? DEFAULT_CURRENCY[defaultChain.id];
   const minDelta = parseUnits(minVoucherDelta, decimals);
@@ -248,7 +248,7 @@ export function session(params: HederaSessionServerOptions) {
   ) {
     return publicClient.readContract({
       address: escrowContract,
-      abi: ABSTRACT_STREAM_CHANNEL_ABI,
+      abi: HEDERA_STREAM_CHANNEL_ABI,
       functionName: 'getChannel',
       args: [channelId],
     });
@@ -571,7 +571,7 @@ export function session(params: HederaSessionServerOptions) {
             txHash = await walletClient.writeContract({
               account,
               address: escrowContract,
-              abi: ABSTRACT_STREAM_CHANNEL_ABI,
+              abi: HEDERA_STREAM_CHANNEL_ABI,
               functionName: 'close',
               args: closeArgs,
               ...{
@@ -585,7 +585,7 @@ export function session(params: HederaSessionServerOptions) {
             txHash = await walletClient.writeContract({
               account,
               address: escrowContract,
-              abi: ABSTRACT_STREAM_CHANNEL_ABI,
+              abi: HEDERA_STREAM_CHANNEL_ABI,
               functionName: 'close',
               args: closeArgs,
             });

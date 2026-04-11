@@ -12,12 +12,12 @@ import { session } from './session.js';
  * @example
  * ```ts
  * import { Mppx } from 'mppx/server'
- * import { abstract } from '@abstract-foundation/mpp/server'
+ * import { hedera } from 'mppx-hedera/server'
  *
  * const mppx = Mppx.create({
- *   methods: [abstract.charge({ ... }), abstract.session({ ... })],
+ *   methods: [hedera.charge({ ... }), hedera.session({ ... })],
  *   secretKey: process.env.MPP_SECRET_KEY!,
  * })
  * ```
  */
-export const abstract = { charge, session };
+export const hedera = { charge, session };

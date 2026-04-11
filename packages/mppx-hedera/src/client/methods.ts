@@ -1,5 +1,5 @@
 /**
- * Abstract MPP method definitions (client + server share the same schema objects).
+ * Hedera MPP method definitions (client + server share the same schema objects).
  */
 
 import { Method, z } from 'mppx';
@@ -46,7 +46,7 @@ export const chargeMethod = Method.from({
 });
 
 /**
- * Abstract session intent — payment channels backed by AbstractStreamChannel.
+ * Abstract session intent — payment channels backed by HederaStreamChannel.
  */
 export const sessionMethod = Method.from({
   name: 'hedera',

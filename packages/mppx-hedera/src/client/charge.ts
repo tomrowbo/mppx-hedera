@@ -1,5 +1,5 @@
 /**
- * Client-side charge credential creator for the Abstract MPP payment method.
+ * Client-side charge credential creator for the Hedera MPP payment method.
  *
  * The client signs an ERC-3009 `TransferWithAuthorization` typed-data message.
  * No transaction is sent from the client side — the server broadcasts the
@@ -69,7 +69,7 @@ export interface HederaChargeClientOptions {
  *
  * @example
  * ```ts
- * import { hederaCharge } from '@abstract-foundation/mpp/client'
+ * import { hederaCharge } from 'mppx-hedera/client'
  * import { privateKeyToAccount } from 'viem/accounts'
  *
  * const charge = hederaCharge({ account: privateKeyToAccount('0x...') })
