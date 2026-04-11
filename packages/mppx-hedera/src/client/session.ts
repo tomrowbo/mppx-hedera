@@ -69,13 +69,9 @@ export interface HederaSessionClientOptions {
   /** Override escrow contract (falls back to challenge.request.methodDetails.escrowContract). */
   escrowContract?: Address;
   /** Override the wallet client factory (advanced). */
-  getClient?: (
-    chainId: number,
-  ) =>
+  getClient?: (chainId: number) => WalletClient | Promise<WalletClient>;
   /** Override the public client factory (advanced). */
-  getPublicClient?: (
-    chainId: number,
-  ) =>
+  getPublicClient?: (chainId: number) => PublicClient | Promise<PublicClient>;
   /**
    * Called after a channel is opened on-chain but before the first voucher is
    * signed. If it returns a Promise the voucher signing is deferred until
@@ -117,21 +113,22 @@ export function hederaSession(options: HederaSessionClientOptions) {
     return `${payee.toLowerCase()}:${currency.toLowerCase()}:${escrow.toLowerCase()}`;
   }
 
-  async function resolveWalletClient(
-    chainId: number,
+  async function resolveWalletClient(chainId: number): Promise<WalletClient> {
     if (options.getClient) return options.getClient(chainId);
     const chain = resolveChain(chainId);
+    return createWalletClient({
       account,
       chain,
-      transport: http(rpcUrl),
+      transport: http(rpcUrl ?? chain.rpcUrls.default.http[0]),
+    });
   }
 
-  async function resolvePublicClient(
-    chainId: number,
+  async function resolvePublicClient(chainId: number): Promise<PublicClient> {
     if (options.getPublicClient) return options.getPublicClient(chainId);
     const chain = resolveChain(chainId);
+    return createPublicClient({
       chain,
-      transport: http(rpcUrl),
+      transport: http(rpcUrl ?? chain.rpcUrls.default.http[0]),
     });
   }
 
@@ -167,7 +164,7 @@ export function hederaSession(options: HederaSessionClientOptions) {
       const req = challenge.request as Record<string, unknown>;
       const md = (req.methodDetails ?? {}) as Record<string, unknown>;
 
-      const chainId = (md.chainId as number | undefined) ?? resolveChain(2741).id;
+      const chainId = (md.chainId as number | undefined) ?? resolveChain(295).id;
       const currency = req.currency as Address;
       const recipient = req.recipient as Address;
       const amountRaw = req.amount as string;

@@ -29,7 +29,7 @@ import {
   VOUCHER_DOMAIN_VERSION,
   VOUCHER_TYPES,
 } from '../constants.ts';
-import { assertUint128, resolveChain } from '../internal.ts';
+import { assertUint128, resolveChain, hederaTestnet, hederaMainnet } from '../internal.ts';
 
 interface VoucherRecord {
   channelId: Hex;
@@ -121,7 +121,7 @@ export interface HederaSessionServerOptions {
   unitType?: string;
   /** Decimals for amount conversion. Default 6. */
   decimals?: number;
-  /** Use testnet (chainId 11124). */
+  /** Use testnet (chainId 296). */
   testnet?: boolean;
   /** Custom RPC URL. */
   rpcUrl?: string;
@@ -223,15 +223,13 @@ export function session(params: HederaSessionServerOptions) {
     params.store ?? Store.memory(),
   );
 
-  function buildClients(chainId: number): {
-  } {
+  function buildClients(chainId: number) {
     const chain = resolveChain(chainId);
-    const transport = http(rpcUrl);
+    const rpcTransport = http(rpcUrl ?? chain.rpcUrls.default.http[0]);
 
     return {
-      publicClient: createPublicClient({ chain, transport }),
-      walletClient: createWalletClient({ account, chain, transport }).extend(
-      ),
+      publicClient: createPublicClient({ chain, transport: rpcTransport }),
+      walletClient: createWalletClient({ account, chain, transport: rpcTransport }),
     };
   }
 
