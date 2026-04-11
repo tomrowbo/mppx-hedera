@@ -17,7 +17,8 @@ import {
   type Log,
 } from 'viem';
 import { chargeMethod } from '../client/methods.js';
-import { resolveChain, DEFAULT_CURRENCY } from '../constants.js';
+import { resolveChain } from '../internal.js';
+import { DEFAULT_CURRENCY } from '../constants.js';
 
 export interface HederaChargeServerOptions {
   /** Override the RPC URL (defaults to the chain's Hashio endpoint). */

@@ -1,89 +1,95 @@
+<!--
+  EDIT RULES (for Phoebe / any styling agent):
+  - Do not change any id="..." attributes (client.ts depends on them)
+  - Do not remove the <script type="module" src="/src/client.ts"></script>
+  - Everything else (CSS, copy, layout, images) is free to edit
+  See phoebe/CHAT_UI_SPEC.md for the design spec.
+-->
 <!doctype html>
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Random Photo</title>
+    <title>mppx-hedera — Agent Demo</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
     <style>
-      * {
-        box-sizing: border-box;
+      :root {
+        --hedera: #8259EF;
+        --hedera-dark: #6B3FE0;
+        --text: #000;
+        --muted: #6B7280;
+        --panel: #F7F7F8;
+        --success: #10B981;
       }
-      body {
-        font-family: system-ui, sans-serif;
-        max-width: 600px;
-        margin: 2rem auto;
-        padding: 1rem;
-      }
-      h1 {
-        margin-bottom: 0.5rem;
-      }
-      p {
-        color: #666;
-        margin-top: 0;
-      }
-      button {
-        padding: 0.75rem 1.5rem;
-        font-size: 1rem;
-        background: #000;
-        color: #fff;
-        border: none;
-        border-radius: 4px;
-        cursor: pointer;
-      }
-      button:hover {
-        background: #333;
-      }
-      button:disabled {
-        background: #999;
-        cursor: not-allowed;
-      }
-      #output {
-        margin-top: 1rem;
-      }
-      #output:empty {
-        display: none;
-      }
-      #output img,
-      .placeholder {
-        width: 400px;
-        height: 400px;
-        border-radius: 8px;
-        display: block;
-      }
-      .placeholder {
-        background: #f0f0f0;
-        border-radius: 8px;
-        animation: shimmer 1.5s infinite;
-      }
-      @keyframes shimmer {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.5;
-        }
-      }
-      .error {
-        color: red;
-        font-family: monospace;
-      }
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body { font-family: 'Inter', system-ui, sans-serif; height: 100vh; display: flex; flex-direction: column; }
+
+      /* Header */
+      header { background: var(--hedera); color: white; padding: 12px 24px; display: flex; justify-content: space-between; align-items: center; }
+      header .logo { font-weight: 800; font-size: 18px; }
+      header .badge { font-size: 14px; opacity: 0.8; }
+
+      /* Main layout */
+      main { flex: 1; display: flex; overflow: hidden; }
+
+      /* Conversation panel (left) */
+      #messages { flex: 7; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
+      .message { padding: 8px 12px; border-radius: 8px; max-width: 90%; font-size: 15px; line-height: 1.5; }
+      .message.user { background: var(--hedera); color: white; align-self: flex-end; font-weight: 600; }
+      .message.agent { background: var(--panel); color: var(--text); align-self: flex-start; font-family: 'JetBrains Mono', monospace; font-size: 13px; }
+      .message.error { background: #FEE2E2; color: #991B1B; }
+
+      /* Payment panel (right) */
+      #payments { flex: 3; background: var(--panel); border-left: 1px solid #E5E7EB; padding: 16px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; }
+      #payments-title { font-weight: 800; font-size: 14px; color: var(--muted); margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em; }
+      .payment-card { background: white; border: 1px solid #E5E7EB; border-radius: 8px; padding: 10px; font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+      .card-status { font-weight: 600; margin-bottom: 4px; }
+      .card-status.confirmed { color: var(--success); }
+      .card-status.open { color: var(--hedera); }
+      .card-status.settled { color: var(--hedera-dark); }
+      .card-amount { color: var(--text); font-weight: 600; }
+      .card-method, .card-stats { color: var(--muted); font-size: 11px; }
+      .card-link { color: var(--hedera); text-decoration: underline; font-size: 11px; }
+      .card-voucher { display: flex; justify-content: space-between; gap: 8px; }
+      .voucher-city { font-weight: 600; }
+      .voucher-num { color: var(--muted); }
+      .voucher-time { color: var(--success); }
+
+      /* Input bar */
+      #chat-form { display: flex; border-top: 1px solid #E5E7EB; padding: 12px 24px; gap: 12px; background: white; }
+      #chat-input { flex: 1; padding: 12px 16px; border: 2px solid #E5E7EB; border-radius: 8px; font-size: 15px; font-family: inherit; outline: none; }
+      #chat-input:focus { border-color: var(--hedera); }
+      #chat-form button { padding: 12px 24px; background: var(--hedera); color: white; border: none; border-radius: 8px; font-weight: 600; font-size: 15px; cursor: pointer; }
+      #chat-form button:hover { background: var(--hedera-dark); }
+
+      /* Footer */
+      footer { text-align: center; font-size: 11px; color: var(--muted); padding: 8px; }
     </style>
   </head>
   <body>
-    <h1>Random Photo</h1>
+    <header>
+      <div class="logo">mppx-hedera</div>
+      <div class="badge">Agentic Payments</div>
+    </header>
 
-    <p>Pay per photo.</p>
+    <main>
+      <div id="messages">
+        <div class="message agent">🤖 I'm an AI agent that pays for data using USDC on Hedera via MPP. Try asking: "What's the weather in London?" or "Get me the weather for every EU capital"</div>
+      </div>
+      <div id="payments">
+        <div id="payments-title">Payment Activity</div>
+      </div>
+    </main>
 
-    <p id="setup">Setting up ephemeral account...</p>
+    <form id="chat-form">
+      <input id="chat-input" type="text" placeholder="Ask me something..." autocomplete="off" autofocus />
+      <button type="submit">Send</button>
+    </form>
 
-    <div id="ready" style="display: none">
-      <p>Balance: <span id="balance"></span></p>
-
-      <button type="button" id="button">Generate Photo ($0.01)</button>
-
-      <div id="output"></div>
-    </div>
+    <footer>
+      mppx-hedera · Agentic Society Hackathon @ LSE · April 2026 · Built on Hedera
+    </footer>
 
     <script type="module" src="/src/client.ts"></script>
   </body>
