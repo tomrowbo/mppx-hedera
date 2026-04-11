@@ -20,7 +20,7 @@
     "zod": ">=3.23.0"
   },
   "devDependencies": {
-    "typescript": "latest",
+    "typescript": "^6.0.2",
     "vitest": "latest"
   }
 }
