@@ -19,7 +19,7 @@ import {
   type WalletClient,
   zeroAddress,
 } from 'viem';
-import { sessionMethod } from '../client/methods.ts';
+import { sessionMethod } from '../client/methods.js';
 import {
   HEDERA_STREAM_CHANNEL_ABI,
   DEFAULT_CURRENCY,
@@ -28,8 +28,8 @@ import {
   VOUCHER_DOMAIN_NAME,
   VOUCHER_DOMAIN_VERSION,
   VOUCHER_TYPES,
-} from '../constants.ts';
-import { assertUint128, resolveChain, hederaTestnet, hederaMainnet } from '../internal.ts';
+} from '../constants.js';
+import { assertUint128, resolveChain, hederaTestnet, hederaMainnet } from '../internal.js';
 
 interface VoucherRecord {
   channelId: Hex;

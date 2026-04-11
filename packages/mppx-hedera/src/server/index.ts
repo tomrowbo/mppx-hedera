@@ -1,10 +1,10 @@
-export type { HederaChargeServerOptions } from './charge.ts';
-export { charge } from './charge.ts';
-export type { HederaSessionServerOptions } from './session.ts';
-export { session } from './session.ts';
+export type { HederaChargeServerOptions } from './charge.js';
+export { charge } from './charge.js';
+export type { HederaSessionServerOptions } from './session.js';
+export { session } from './session.js';
 
-import { charge } from './charge.ts';
-import { session } from './session.ts';
+import { charge } from './charge.js';
+import { session } from './session.js';
 
 /**
  * Convenience namespace — mirrors the `tempo` export pattern from mppx.
