@@ -17,9 +17,9 @@ export const USDC_DECIMALS = 6;
 // ─── HederaStreamChannel escrow contract ───────────────────────────
 // Deployed on both testnet and mainnet
 export const HEDERA_STREAM_CHANNEL_TESTNET =
-  '0xd5235aC832d606E8f1E0Aa40a675b54483F6fe43' as const; // Deployed 2026-04-11, Hedera 0.0.8598672
+  '0x401b6dc30221823361E4876f5C502e37249D84C3' as const; // Deployed 2026-04-12, fully verified on Sourcify
 export const HEDERA_STREAM_CHANNEL_MAINNET =
-  '0xAE27c6a54aD536a2De47B6B096Ca3FBcee738eFB' as const; // Deployed 2026-04-11, Hedera 0.0.10430642
+  '0x401b6dc30221823361E4876f5C502e37249D84C3' as const; // Deployed 2026-04-12, fully verified on Sourcify
 
 /** ABI for the HederaStreamChannel escrow contract. */
 export const HEDERA_STREAM_CHANNEL_ABI = [
