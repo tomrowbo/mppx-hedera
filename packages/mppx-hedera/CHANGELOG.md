@@ -1,5 +1,10 @@
 # mppx-hedera
 
+## 0.1.4
+
+- Redeployed contracts with full Sourcify verification (both testnet + mainnet)
+- Same deterministic address on both networks: `0x401b6dc30221823361E4876f5C502e37249D84C3`
+
 ## 0.1.3
 
 - Fixed contract addresses in published package
