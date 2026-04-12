@@ -29,8 +29,8 @@ No facilitator. The server verifies directly against Hedera's JSON-RPC relay and
 
 | Network | HederaStreamChannel | USDC |
 |---|---|---|
-| Mainnet | [`0xb68B...2BF`](https://hashscan.io/mainnet/contract/0xAE27c6a54aD536a2De47B6B096Ca3FBcee738eFB) | 0.0.456858 (Circle) |
-| Testnet | [`0x2474...6e8`](https://hashscan.io/testnet/contract/0xd5235aC832d606E8f1E0Aa40a675b54483F6fe43) | 0.0.5449 |
+| Mainnet | [`0xAE27...eFB`](https://hashscan.io/mainnet/contract/0xAE27c6a54aD536a2De47B6B096Ca3FBcee738eFB) | 0.0.456858 (Circle) |
+| Testnet | [`0xd523...e43`](https://hashscan.io/testnet/contract/0xd5235aC832d606E8f1E0Aa40a675b54483F6fe43) | 0.0.5449 |
 
 ## Quick example
 
