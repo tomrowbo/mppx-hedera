@@ -92,12 +92,102 @@ const mppx = Mppx.create({
 
 The `402` challenge advertises all methods; the client uses whichever it supports.
 
+## Integration guide
+
+### Setup
+
+```bash
+npm install mppx-hedera mppx viem
+```
+
+Import using dynamic `import()` in CommonJS, or standard imports in ESM:
+
+```ts
+// ESM
+import { hederaTestnet, hederaMainnet, USDC_TESTNET, HEDERA_STREAM_CHANNEL_ABI } from 'mppx-hedera'
+import { charge } from 'mppx-hedera/server'
+
+// CommonJS
+const sdk = await import('mppx-hedera')
+```
+
+### Create a wallet client
+
+```ts
+import { createWalletClient, createPublicClient, http } from 'viem'
+import { privateKeyToAccount } from 'viem/accounts'
+import { hederaTestnet } from 'mppx-hedera'
+
+const account = privateKeyToAccount('0x...')
+const wallet = createWalletClient({ account, chain: hederaTestnet, transport: http() })
+const publicClient = createPublicClient({ chain: hederaTestnet, transport: http() })
+```
+
+### USDC transfer (charge)
+
+```ts
+import { encodeFunctionData, erc20Abi } from 'viem'
+import { USDC_TESTNET } from 'mppx-hedera'
+
+const data = encodeFunctionData({
+  abi: erc20Abi,
+  functionName: 'transfer',
+  args: [recipientAddress, 10_000n], // 0.01 USDC
+})
+
+const txHash = await wallet.sendTransaction({
+  to: USDC_TESTNET,
+  data,
+  gas: 500_000n, // HTS precompile needs explicit gas
+})
+```
+
+### Session (escrow channel)
+
+```ts
+import { HEDERA_STREAM_CHANNEL_ABI, HEDERA_STREAM_CHANNEL_TESTNET } from 'mppx-hedera'
+
+// 1. Approve USDC for the escrow (needs 1M gas for HTS)
+await wallet.sendTransaction({
+  to: USDC_TESTNET,
+  data: encodeFunctionData({ abi: erc20Abi, functionName: 'approve', args: [HEDERA_STREAM_CHANNEL_TESTNET, 100_000n] }),
+  gas: 1_000_000n,
+})
+
+// 2. Open channel
+const openTx = await wallet.writeContract({
+  address: HEDERA_STREAM_CHANNEL_TESTNET,
+  abi: HEDERA_STREAM_CHANNEL_ABI,
+  functionName: 'open',
+  args: [payeeAddress, USDC_TESTNET, 100_000n, salt, zeroAddress],
+  gas: 1_500_000n,
+})
+
+// 3. Sign vouchers off-chain (sub-millisecond, no gas)
+const digest = await publicClient.readContract({
+  address: HEDERA_STREAM_CHANNEL_TESTNET,
+  abi: HEDERA_STREAM_CHANNEL_ABI,
+  functionName: 'getVoucherDigest',
+  args: [channelId, cumulativeAmount],
+})
+const signature = await account.signMessage({ message: { raw: digest } })
+
+// 4. Settle
+await wallet.writeContract({
+  address: HEDERA_STREAM_CHANNEL_TESTNET,
+  abi: HEDERA_STREAM_CHANNEL_ABI,
+  functionName: 'settle',
+  args: [channelId, cumulativeAmount, signature],
+  gas: 1_500_000n,
+})
+```
+
 ## Deployed contracts
 
 | Network | HederaStreamChannel | USDC | Chain ID |
 |---|---|---|---|
-| Testnet | [`0x8226...D83`](https://hashscan.io/testnet/contract/0x8226214188f22B9ddA901fb9ac85781eA4500D83) | `0x...001549` (0.0.5449) | 296 |
-| Mainnet | [`0x3cf6...3A3`](https://hashscan.io/mainnet/contract/0x3cf652150A3f3CC768854dAb0c252E35eBd093A3) | `0x...06f89a` (0.0.456858, Circle) | 295 |
+| Testnet | [`0x2474...6e8`](https://hashscan.io/testnet/contract/0xd5235aC832d606E8f1E0Aa40a675b54483F6fe43) | `0x...001549` (0.0.5449) | 296 |
+| Mainnet | [`0xb68B...2BF`](https://hashscan.io/mainnet/contract/0xAE27c6a54aD536a2De47B6B096Ca3FBcee738eFB) | `0x...06f89a` (0.0.456858, Circle) | 295 |
 
 Both contracts are verified on [Hashscan](https://hashscan.io). The escrow is a port of [Tempo's StreamChannel](https://github.com/tempoxyz/mpp-specs) via [@abstract-foundation/mpp](https://github.com/Abstract-Foundation/mpp-abstract), with the EIP-712 domain set to `"Hedera Stream Channel"`.
 
