@@ -92,6 +92,16 @@ const mppx = Mppx.create({
 
 The `402` challenge advertises all methods; the client uses whichever it supports.
 
+## Integration example
+
+See [`hedera-ai-agent-chat`](https://github.com/Phoebe-PayBe/hedera-ai-agent-chat) for a complete demo: an AI travel agent that pays for airline data using `mppx-hedera`. The real Hedera integration is [84 lines](https://github.com/Phoebe-PayBe/hedera-ai-agent-chat/blob/main/payment/hedera.js) — the same size as the mock.
+
+```bash
+# Toggle between mock and real payments with one env var
+PAYMENT_MODE=mock    # fake transactions, no tokens spent
+PAYMENT_MODE=hedera  # real USDC on Hedera (testnet or mainnet)
+```
+
 ## Deployed contracts
 
 | Network | HederaStreamChannel | USDC | Chain ID |
