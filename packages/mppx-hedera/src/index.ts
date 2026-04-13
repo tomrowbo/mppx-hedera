@@ -8,6 +8,9 @@
 // Schemas (shared between client + server)
 export { chargeMethod, sessionMethod } from './client/methods.js';
 
+// Attribution memo encoding (same layout as Tempo)
+export * as Attribution from './attribution.js';
+
 // Chain definitions
 export { hederaTestnet, hederaMainnet } from './internal.js';
 

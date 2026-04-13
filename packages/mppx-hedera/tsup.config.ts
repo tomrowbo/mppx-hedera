@@ -10,5 +10,5 @@ export default defineConfig({
   dts: false,  // skip type declarations for hackathon speed
   clean: true,
   sourcemap: true,
-  external: ['mppx', 'viem', 'zod'],
+  external: ['mppx', 'viem', 'zod', '@hashgraph/sdk'],
 })

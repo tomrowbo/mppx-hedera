@@ -50,3 +50,18 @@ export function randomBytes32(): `0x${string}` {
   globalThis.crypto.getRandomValues(bytes);
   return bytesToHex(bytes);
 }
+
+/** Resolves the Mirror Node base URL for a given chain ID. */
+export function resolveMirrorNode(chainId: number): string {
+  if (chainId === hederaTestnet.id) return 'https://testnet.mirrornode.hedera.com';
+  if (chainId === hederaMainnet.id) return 'https://mainnet.mirrornode.hedera.com';
+  throw new Error(`Unsupported Hedera chainId ${chainId} for Mirror Node`);
+}
+
+/**
+ * Converts a Hedera SDK TransactionId.toString() to Mirror Node URL format.
+ * "0.0.12345@1681234567.123456789" → "0.0.12345-1681234567-123456789"
+ */
+export function formatTxIdForMirrorNode(transactionId: string): string {
+  return transactionId.replace('@', '-').replace(/\.(?=\d+$)/, '-');
+}

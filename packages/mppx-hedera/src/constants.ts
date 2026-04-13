@@ -233,3 +233,21 @@ export const DEFAULT_ESCROW: Record<number, `0x${string}`> = {
   [hederaTestnet.id]: HEDERA_STREAM_CHANNEL_TESTNET,
   [hederaMainnet.id]: HEDERA_STREAM_CHANNEL_MAINNET,
 };
+
+// ─── Mirror Node REST API ────────────────────────────────────────
+export const MIRROR_NODE_TESTNET = 'https://testnet.mirrornode.hedera.com' as const;
+export const MIRROR_NODE_MAINNET = 'https://mainnet.mirrornode.hedera.com' as const;
+
+export const DEFAULT_MIRROR_NODE: Record<number, string> = {
+  [hederaTestnet.id]: MIRROR_NODE_TESTNET,
+  [hederaMainnet.id]: MIRROR_NODE_MAINNET,
+};
+
+// ─── Hedera-native token IDs (shard.realm.num) ──────────────────
+export const USDC_TOKEN_ID_TESTNET = '0.0.5449' as const;
+export const USDC_TOKEN_ID_MAINNET = '0.0.456858' as const;
+
+export const DEFAULT_TOKEN_ID: Record<number, string> = {
+  [hederaTestnet.id]: USDC_TOKEN_ID_TESTNET,
+  [hederaMainnet.id]: USDC_TOKEN_ID_MAINNET,
+};

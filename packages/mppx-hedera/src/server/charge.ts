@@ -1,114 +1,130 @@
 /**
- * mppx-hedera/server — charge intent verification
+ * mppx-hedera/server — charge intent verification via Mirror Node
  *
- * Server-side: verifies that an ERC-20 transfer actually landed on Hedera
- * with the correct amount, recipient, and token.
+ * Server-side: verifies a Hedera native token transfer by querying the
+ * Mirror Node REST API. Checks:
+ *   1. Transaction exists and succeeded
+ *   2. Attribution memo is bound to this challenge (replay protection)
+ *   3. Token transfer matches expected amount, recipient, and token
+ *   4. Transaction ID has not been used before (idempotency)
  *
- * Ported from @stablecoin.xyz/radius-mpp (MIT) with Hedera chain config,
- * typed errors from mppx core, and Store-based idempotency.
+ * No facilitator — reads Mirror Node directly.
  */
 
 import { Errors, Method, Receipt, Store } from 'mppx';
-import {
-  createPublicClient,
-  http,
-  decodeEventLog,
-  erc20Abi,
-  type Log,
-} from 'viem';
 import { chargeMethod } from '../client/methods.js';
-import { resolveChain } from '../internal.js';
-import { DEFAULT_CURRENCY } from '../constants.js';
+import { resolveMirrorNode, formatTxIdForMirrorNode } from '../internal.js';
+import { DEFAULT_TOKEN_ID } from '../constants.js';
+import * as Attribution from '../attribution.js';
 
 export interface HederaChargeServerOptions {
-  /** Override the RPC URL (defaults to the chain's Hashio endpoint). */
-  rpcUrl?: string;
-  /** Number of confirmations to require. Defaults to 1. */
-  confirmations?: number;
+  /** Server identity for Attribution memo verification. Must match what clients use. */
+  serverId: string;
+  /** Override the Mirror Node REST API base URL. */
+  mirrorNodeUrl?: string;
   /** Pluggable store for idempotency. Defaults to in-memory. */
   store?: Store.Store;
+  /** Max retries when Mirror Node hasn't indexed the tx yet. Defaults to 10. */
+  maxRetries?: number;
+  /** Delay in ms between retries. Defaults to 2000. */
+  retryDelay?: number;
 }
 
 /**
- * Creates a server-side Hedera charge handler that verifies ERC-20 Transfer
- * events from the tx receipt. No facilitator — reads Hashio directly.
+ * Creates a server-side Hedera charge handler that verifies native token
+ * transfers via the Mirror Node REST API with challenge-bound memo verification.
+ *
+ * @example
+ * ```ts
+ * import { Mppx } from 'mppx/server'
+ * import { hedera } from 'mppx-hedera/server'
+ *
+ * const mppx = Mppx.create({
+ *   methods: [hedera.charge({ serverId: 'api.example.com' })],
+ *   secretKey: process.env.MPP_SECRET_KEY!,
+ * })
+ * ```
  */
-export function charge(config: HederaChargeServerOptions = {}) {
-  const { confirmations = 1 } = config;
+export function charge(config: HederaChargeServerOptions) {
+  const { serverId, maxRetries = 10, retryDelay = 2000 } = config;
   const store = config.store ?? Store.memory();
 
   return Method.toServer(chargeMethod, {
     async verify({ credential }) {
-      const { txHash } = credential.payload;
-      const { amount, chainId, recipient, payer } = credential.challenge.request;
-      const token = credential.challenge.request.token ?? DEFAULT_CURRENCY[chainId];
+      const { transactionId } = credential.payload;
+      const { amount, chainId, recipient } = credential.challenge.request;
+      const tokenId = DEFAULT_TOKEN_ID[chainId];
 
-      const chain = resolveChain(chainId);
-      const rpcUrl = config.rpcUrl ?? chain.rpcUrls.default.http[0];
-      const publicClient = createPublicClient({ chain, transport: http(rpcUrl) });
+      const mirrorNodeUrl =
+        config.mirrorNodeUrl ?? resolveMirrorNode(chainId);
 
-      // Idempotency: reject tx reuse
-      const storeKey = `hedera:charge:${txHash}`;
+      // ── 1. Idempotency: reject tx reuse ──────────────────────────
+      const storeKey = `hedera:charge:${transactionId}`;
       const seen = await store.get(storeKey);
       if (seen !== null) {
         throw new Errors.VerificationFailedError({
-          reason: 'Transaction hash already used',
+          reason: 'Transaction ID already used',
         });
       }
 
-      // Fetch the receipt via Hashio JSON-RPC
-      const receipt = await publicClient.getTransactionReceipt({
-        hash: txHash as `0x${string}`,
-      });
+      // ── 2. Fetch transaction from Mirror Node ────────────────────
+      const urlTxId = formatTxIdForMirrorNode(transactionId);
+      const tx = await fetchTransaction(mirrorNodeUrl, urlTxId, maxRetries, retryDelay);
 
-      if (receipt.status !== 'success') {
+      if (tx.result !== 'SUCCESS') {
         throw new Errors.VerificationFailedError({
-          reason: `Transaction reverted on-chain (status: ${receipt.status})`,
+          reason: `Transaction result: ${tx.result}`,
         });
       }
 
-      // Optional payer check
-      if (payer && receipt.from.toLowerCase() !== payer.toLowerCase()) {
+      // ── 3. Verify Attribution memo (challenge binding) ───────────
+      const memoHex = decodeMemoBase64(tx.memo_base64);
+
+      if (!Attribution.isMppMemo(memoHex)) {
         throw new Errors.VerificationFailedError({
-          reason: `Transaction sender ${receipt.from} does not match expected payer ${payer}`,
+          reason: 'Transaction memo is not a valid MPP attribution memo',
         });
       }
 
-      // Verify the tx was sent to the correct token contract
-      if (receipt.to?.toLowerCase() !== token?.toLowerCase()) {
+      if (!Attribution.verifyServer(memoHex, serverId)) {
         throw new Errors.VerificationFailedError({
-          reason: `Transaction target ${receipt.to} does not match expected token ${token}`,
+          reason: 'Memo server fingerprint does not match',
         });
       }
 
-      // Find the ERC-20 Transfer event matching recipient + amount
-      const transferLog = findMatchingTransferLog(
-        receipt.logs,
-        token!,
-        recipient,
-        BigInt(amount),
+      const challengeId = credential.challenge.id as string;
+      if (!Attribution.verifyChallengeBinding(memoHex, challengeId)) {
+        throw new Errors.VerificationFailedError({
+          reason: 'Memo challenge nonce does not match — possible replay',
+        });
+      }
+
+      // ── 4. Verify token transfer (amount + recipient + token) ────
+      const tokenTransfers: {
+        token_id: string;
+        account: string;
+        amount: number;
+      }[] = tx.token_transfers ?? [];
+
+      const matchingCredit = tokenTransfers.find(
+        (t) =>
+          t.token_id === tokenId &&
+          t.account === recipient &&
+          BigInt(t.amount) >= BigInt(amount),
       );
 
-      if (!transferLog) {
+      if (!matchingCredit) {
         throw new Errors.VerificationFailedError({
-          reason: `No matching ERC-20 Transfer event found for recipient ${recipient} with amount ${amount}`,
+          reason: `No matching token transfer: expected ${amount} of ${tokenId} to ${recipient}`,
         });
       }
 
-      // Wait for additional confirmations if configured
-      if (confirmations > 1) {
-        await publicClient.waitForTransactionReceipt({
-          hash: txHash as `0x${string}`,
-          confirmations,
-        });
-      }
-
-      // Mark as used
+      // ── 5. Mark as used ──────────────────────────────────────────
       await store.set(storeKey, Date.now());
 
       return Receipt.from({
         method: 'hedera',
-        reference: txHash,
+        reference: transactionId,
         status: 'success',
         timestamp: new Date().toISOString(),
       });
@@ -118,31 +134,49 @@ export function charge(config: HederaChargeServerOptions = {}) {
 
 // ─── Helpers ───────────────────────────────────────────────────────
 
-function findMatchingTransferLog(
-  logs: Log[],
-  token: string,
-  recipient: string,
-  minAmount: bigint,
-) {
-  for (const log of logs) {
-    if (log.address.toLowerCase() !== token.toLowerCase()) continue;
-    try {
-      const decoded = decodeEventLog({
-        abi: erc20Abi,
-        data: log.data,
-        topics: log.topics,
-      });
-      if (decoded.eventName !== 'Transfer') continue;
-      const { to, value } = decoded.args as { to: `0x${string}`; value: bigint };
-      if (
-        to.toLowerCase() === recipient.toLowerCase() &&
-        value >= minAmount
-      ) {
-        return { to, value };
-      }
-    } catch {
+/**
+ * Fetches a transaction from the Mirror Node REST API with retry logic
+ * to handle the 3-5 second indexing lag after consensus.
+ */
+async function fetchTransaction(
+  mirrorNodeUrl: string,
+  urlTxId: string,
+  maxRetries: number,
+  retryDelay: number,
+): Promise<any> {
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const resp = await fetch(
+      `${mirrorNodeUrl}/api/v1/transactions/${urlTxId}`,
+    );
+
+    if (resp.ok) {
+      const data = await resp.json();
+      if (data?.transactions?.length) return data.transactions[0];
+    }
+
+    if (resp.status === 404 && attempt < maxRetries) {
+      await new Promise((r) => setTimeout(r, retryDelay));
       continue;
     }
+
+    throw new Error(
+      `Mirror Node returned ${resp.status} for transaction ${urlTxId}`,
+    );
   }
-  return null;
+
+  throw new Error(`Transaction ${urlTxId} not found after ${maxRetries} retries`);
+}
+
+/**
+ * Decodes the base64-encoded memo from the Mirror Node response
+ * into the hex string used by Attribution.
+ */
+function decodeMemoBase64(memoBase64: string): `0x${string}` {
+  if (!memoBase64) return '0x' as `0x${string}`;
+  const decoded = Buffer.from(memoBase64, 'base64').toString('utf-8');
+  // The memo is stored as a "0x..." hex string
+  if (decoded.startsWith('0x') && decoded.length === 66) {
+    return decoded as `0x${string}`;
+  }
+  return '0x' as `0x${string}`;
 }
