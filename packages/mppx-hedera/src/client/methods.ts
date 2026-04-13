@@ -6,10 +6,10 @@ import { Method, z } from 'mppx';
 import { parseUnits } from 'viem';
 
 /**
- * Hedera charge intent — one-time ERC-20 USDC transfer.
+ * Hedera charge intent — one-time USDC transfer via native Hedera transaction.
  *
- * The credential payload carries the ERC-3009 typed-data signature so the
- * server can call `transferWithAuthorization` on behalf of the payer.
+ * The credential payload carries the Hedera transaction ID so the server can
+ * verify the transfer and challenge-bound memo via the Mirror Node REST API.
  */
 export const chargeMethod = Method.from({
   name: 'hedera',
@@ -17,12 +17,8 @@ export const chargeMethod = Method.from({
   schema: {
     credential: {
       payload: z.object({
-        type: z.literal('authorization'),
-        signature: z.signature(),
-        nonce: z.hash(),
-        validAfter: z.amount(),
-        validBefore: z.amount(),
-        from: z.address(),
+        transactionId: z.string(),
+        type: z.literal('hash'),
       }),
     },
     request: z.pipe(

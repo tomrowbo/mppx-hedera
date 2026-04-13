@@ -1,80 +1,125 @@
 /**
- * mppx-hedera/client — charge intent
+ * mppx-hedera/client — charge intent (native Hedera transaction)
  *
- * Client-side: signs and broadcasts an ERC-20 transfer on Hedera via Hashio,
- * then returns the txHash as the Credential payload.
+ * Client-side: builds a native Hedera TransferTransaction with an MPP
+ * attribution memo (challenge-bound), submits it via the Hedera SDK,
+ * and returns the transaction ID as the Credential payload.
  *
- * Ported from @stablecoin.xyz/radius-mpp (MIT) with Hedera chain config.
- * Uses plain ERC-20 transfer() — not ERC-3009 (HTS tokens don't support it).
+ * The attribution memo uses the same 32-byte layout as Tempo's Attribution.ts,
+ * ensuring compatibility with the mppx ecosystem's challenge-binding verification.
  */
 
 import { Credential, Method } from 'mppx';
 import {
-  createPublicClient,
-  http,
-  type Account,
-  type Chain,
-  type Transport,
-  type WalletClient,
-  encodeFunctionData,
-  erc20Abi,
-} from 'viem';
+  Client as HederaClient,
+  TransferTransaction,
+  AccountId,
+  TokenId,
+  PrivateKey,
+} from '@hashgraph/sdk';
 import { chargeMethod } from './methods.js';
-import { resolveChain } from '../internal.js';
-import { DEFAULT_CURRENCY } from '../constants.js';
+import { DEFAULT_TOKEN_ID } from '../constants.js';
+import * as Attribution from '../attribution.js';
 
 export interface HederaChargeClientOptions {
-  /** A viem WalletClient with an account attached (e.g. via privateKeyToAccount). */
-  walletClient: WalletClient<Transport, Chain, Account>;
-  /** Number of block confirmations to wait. Defaults to 1. */
-  confirmations?: number;
+  /** Hedera account ID of the payer, e.g. "0.0.12345". */
+  operatorId: string;
+  /** Private key (hex or DER-encoded) for the operator account. */
+  operatorKey: string;
+  /** Network: 'testnet' or 'mainnet'. Defaults to 'testnet'. */
+  network?: 'testnet' | 'mainnet';
+  /** Optional client identity for the attribution memo. */
+  clientId?: string;
 }
 
 /**
- * Creates a client-side Hedera charge method that signs a plain ERC-20
- * transfer and returns the txHash as the credential.
+ * Creates a client-side Hedera charge method that submits a native
+ * token transfer with an MPP attribution memo.
+ *
+ * @example
+ * ```ts
+ * import { charge } from 'mppx-hedera/client'
+ *
+ * const hederaCharge = charge({
+ *   operatorId: '0.0.12345',
+ *   operatorKey: '0x...',
+ *   network: 'testnet',
+ * })
+ * ```
  */
 export function charge(config: HederaChargeClientOptions) {
-  const { walletClient, confirmations = 1 } = config;
+  const {
+    operatorId,
+    operatorKey,
+    network = 'testnet',
+    clientId,
+  } = config;
+
+  // Parse key — supports hex (with or without 0x prefix) and DER
+  const key = operatorKey.startsWith('0x')
+    ? PrivateKey.fromStringECDSA(operatorKey.slice(2))
+    : PrivateKey.fromStringECDSA(operatorKey);
 
   return Method.toClient(chargeMethod, {
     async createCredential({ challenge }) {
       const req = challenge.request as any;
-      const chainId = req.methodDetails?.chainId ?? 296;
-      const { amount, recipient } = req;
-      const token = req.token ?? DEFAULT_CURRENCY[chainId];
-      if (!token) throw new Error(`No USDC token configured for chainId ${chainId}`);
+      const chainId = req.methodDetails?.chainId ?? (network === 'mainnet' ? 295 : 296);
 
-      const chain = resolveChain(chainId);
-      const publicClient = createPublicClient({
-        chain,
-        transport: http(chain.rpcUrls.default.http[0]),
+      // Resolve Hedera-native token ID
+      const tokenId = DEFAULT_TOKEN_ID[chainId];
+      if (!tokenId) throw new Error(`No USDC token configured for chainId ${chainId}`);
+
+      const amount = Number(BigInt(req.amount));
+      const recipient = req.recipient as string; // expects "0.0.XXXX" format
+
+      // Build Attribution memo (same layout as Tempo)
+      const serverId = (challenge as any).realm ?? 'hedera-mpp';
+      const memo = Attribution.encode({
+        challengeId: challenge.id as string,
+        clientId,
+        serverId,
       });
 
-      // Build ERC-20 transfer(recipient, amount) calldata
-      const data = encodeFunctionData({
-        abi: erc20Abi,
-        functionName: 'transfer',
-        args: [recipient as `0x${string}`, BigInt(amount)],
-      });
+      // Create Hedera client
+      const client = network === 'mainnet'
+        ? HederaClient.forMainnet()
+        : HederaClient.forTestnet();
+      client.setOperator(AccountId.fromString(operatorId), key);
 
-      // Submit with explicit gas — Hashio underestimates for HTS precompile calls
-      const txHash = await walletClient.sendTransaction({
-        to: token as `0x${string}`,
-        data,
-        chain,
-        gas: 500_000n,
-      });
+      // Build and execute native TransferTransaction with memo
+      const tx = new TransferTransaction()
+        .addTokenTransfer(
+          TokenId.fromString(tokenId),
+          AccountId.fromString(operatorId),
+          -amount,
+        )
+        .addTokenTransfer(
+          TokenId.fromString(tokenId),
+          AccountId.fromString(recipient),
+          amount,
+        )
+        .setTransactionMemo(memo)
+        .freezeWith(client);
 
-      await publicClient.waitForTransactionReceipt({
-        hash: txHash,
-        confirmations,
-      });
+      const response = await tx.execute(client);
+      const receipt = await response.getReceipt(client);
+
+      if (receipt.status.toString() !== 'SUCCESS') {
+        throw new Error(`Hedera transaction failed: ${receipt.status}`);
+      }
+
+      const transactionId = response.transactionId.toString();
+
+      client.close();
 
       return Credential.serialize({
         challenge,
-        payload: { txHash },
+        payload: { transactionId, type: 'hash' as const },
+        source: `did:pkh:hedera:${network}:${operatorId}`,
       });
     },
   });
 }
+
+// Re-export with legacy name for backward compat
+export { charge as hederaCharge };
