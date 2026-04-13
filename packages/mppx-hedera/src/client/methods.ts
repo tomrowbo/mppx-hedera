@@ -40,7 +40,7 @@ export const chargeMethod = Method.from({
           recipient: z.string(),
           amount: z.amount(),
           memo: z.optional(z.string()),
-        })).min(1).max(10)),
+        }))),
       }),
       z.transform(({ amount, decimals, chainId, externalId, splits, ...rest }) => ({
         ...rest,
