@@ -2,6 +2,7 @@ export type { HederaChargeServerOptions } from './charge.js';
 export { charge } from './charge.js';
 export type { HederaSessionServerOptions } from './session.js';
 export { session } from './session.js';
+export * as Sse from './sse.js';
 
 import { charge } from './charge.js';
 import { session } from './session.js';

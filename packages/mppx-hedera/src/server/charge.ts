@@ -12,6 +12,12 @@
  */
 
 import { Errors, Method, Receipt, Store } from 'mppx';
+import {
+  Transaction,
+  Client as HederaClient,
+  AccountId,
+  PrivateKey,
+} from '@hashgraph/sdk';
 import { chargeMethod } from '../client/methods.js';
 import { resolveMirrorNode, formatTxIdForMirrorNode } from '../internal.js';
 import { DEFAULT_TOKEN_ID } from '../constants.js';
@@ -20,6 +26,10 @@ import * as Attribution from '../attribution.js';
 export interface HederaChargeServerOptions {
   /** Server identity for Attribution memo verification. Must match what clients use. */
   serverId: string;
+  /** Hedera account ID of the payment recipient, e.g. "0.0.12345". */
+  recipient: string;
+  /** Whether to use Hedera testnet (chainId 296). Defaults to false (mainnet, chainId 295). */
+  testnet?: boolean;
   /** Override the Mirror Node REST API base URL. */
   mirrorNodeUrl?: string;
   /** Pluggable store for idempotency. Defaults to in-memory. */
@@ -28,6 +38,10 @@ export interface HederaChargeServerOptions {
   maxRetries?: number;
   /** Delay in ms between retries. Defaults to 2000. */
   retryDelay?: number;
+  /** Server's Hedera account ID (needed for pull mode to submit tx). */
+  operatorId?: string;
+  /** Server's private key (needed for pull mode to submit tx). */
+  operatorKey?: string;
 }
 
 /**
@@ -48,87 +62,234 @@ export interface HederaChargeServerOptions {
 export function charge(config: HederaChargeServerOptions) {
   const { serverId, maxRetries = 10, retryDelay = 2000 } = config;
   const store = config.store ?? Store.memory();
+  const chainId = config.testnet ? 296 : 295;
+
+  // Lazily created Hedera client for pull mode (submitting transactions)
+  let _hederaClient: InstanceType<typeof HederaClient> | null = null;
+  function getHederaClient(): InstanceType<typeof HederaClient> {
+    if (_hederaClient) return _hederaClient;
+    if (!config.operatorId || !config.operatorKey) {
+      throw new Error(
+        'Pull mode requires operatorId and operatorKey in server config',
+      );
+    }
+    const client = config.testnet
+      ? HederaClient.forTestnet()
+      : HederaClient.forMainnet();
+    const key = config.operatorKey.startsWith('0x')
+      ? PrivateKey.fromStringECDSA(config.operatorKey.slice(2))
+      : PrivateKey.fromStringECDSA(config.operatorKey);
+    client.setOperator(AccountId.fromString(config.operatorId), key);
+    _hederaClient = client;
+    return client;
+  }
 
   return Method.toServer(chargeMethod, {
+    request({ request }) {
+      return {
+        ...request,
+        chainId: request.chainId ?? chainId,
+        recipient: request.recipient ?? config.recipient,
+        currency: request.currency ?? DEFAULT_TOKEN_ID[chainId],
+      };
+    },
+
     async verify({ credential }) {
-      const { transactionId } = credential.payload;
-      const { amount, chainId, recipient } = credential.challenge.request;
-      const tokenId = DEFAULT_TOKEN_ID[chainId];
+      const payload = credential.payload;
 
-      const mirrorNodeUrl =
-        config.mirrorNodeUrl ?? resolveMirrorNode(chainId);
-
-      // ── 1. Idempotency: reject tx reuse ──────────────────────────
-      const storeKey = `hedera:charge:${transactionId}`;
-      const seen = await store.get(storeKey);
-      if (seen !== null) {
-        throw new Errors.VerificationFailedError({
-          reason: 'Transaction ID already used',
-        });
+      // ── Dispatch on credential type ──────────────────────────────
+      if (payload.type === 'transaction') {
+        return verifyPullMode(credential, config, store, serverId, getHederaClient);
       }
 
-      // ── 2. Fetch transaction from Mirror Node ────────────────────
-      const urlTxId = formatTxIdForMirrorNode(transactionId);
-      const tx = await fetchTransaction(mirrorNodeUrl, urlTxId, maxRetries, retryDelay);
+      // ── Push mode: verify via Mirror Node ────────────────────────
+      return verifyPushMode(credential, config, store, serverId, maxRetries, retryDelay);
+    },
+  });
+}
 
-      if (tx.result !== 'SUCCESS') {
-        throw new Errors.VerificationFailedError({
-          reason: `Transaction result: ${tx.result}`,
-        });
-      }
+// ─── Push mode verification (existing Mirror Node path) ───────────
 
-      // ── 3. Verify Attribution memo (challenge binding) ───────────
-      const memoHex = decodeMemoBase64(tx.memo_base64);
+async function verifyPushMode(
+  credential: any,
+  config: HederaChargeServerOptions,
+  store: Store.Store,
+  serverId: string,
+  maxRetries: number,
+  retryDelay: number,
+) {
+  const { transactionId } = credential.payload;
+  const { amount, chainId, recipient } = credential.challenge.request;
+  const tokenId = DEFAULT_TOKEN_ID[chainId];
 
-      if (!Attribution.isMppMemo(memoHex)) {
-        throw new Errors.VerificationFailedError({
-          reason: 'Transaction memo is not a valid MPP attribution memo',
-        });
-      }
+  const mirrorNodeUrl =
+    config.mirrorNodeUrl ?? resolveMirrorNode(chainId);
 
-      if (!Attribution.verifyServer(memoHex, serverId)) {
-        throw new Errors.VerificationFailedError({
-          reason: 'Memo server fingerprint does not match',
-        });
-      }
+  // ── 1. Idempotency: reject tx reuse ──────────────────────────
+  const storeKey = `hedera:charge:${transactionId}`;
+  const seen = await store.get(storeKey);
+  if (seen !== null) {
+    throw new Errors.VerificationFailedError({
+      reason: 'Transaction ID already used',
+    });
+  }
 
-      const challengeId = credential.challenge.id as string;
-      if (!Attribution.verifyChallengeBinding(memoHex, challengeId)) {
-        throw new Errors.VerificationFailedError({
-          reason: 'Memo challenge nonce does not match — possible replay',
-        });
-      }
+  // ── 2. Fetch transaction from Mirror Node ────────────────────
+  const urlTxId = formatTxIdForMirrorNode(transactionId);
+  const tx = await fetchTransaction(mirrorNodeUrl, urlTxId, maxRetries, retryDelay);
 
-      // ── 4. Verify token transfer (amount + recipient + token) ────
-      const tokenTransfers: {
-        token_id: string;
-        account: string;
-        amount: number;
-      }[] = tx.token_transfers ?? [];
+  if (tx.result !== 'SUCCESS') {
+    throw new Errors.VerificationFailedError({
+      reason: `Transaction result: ${tx.result}`,
+    });
+  }
 
-      const matchingCredit = tokenTransfers.find(
+  // ── 3. Verify Attribution memo (challenge binding) ───────────
+  const memoHex = decodeMemoBase64(tx.memo_base64);
+
+  if (!Attribution.isMppMemo(memoHex)) {
+    throw new Errors.VerificationFailedError({
+      reason: 'Transaction memo is not a valid MPP attribution memo',
+    });
+  }
+
+  if (!Attribution.verifyServer(memoHex, serverId)) {
+    throw new Errors.VerificationFailedError({
+      reason: 'Memo server fingerprint does not match',
+    });
+  }
+
+  const challengeId = credential.challenge.id as string;
+  if (!Attribution.verifyChallengeBinding(memoHex, challengeId)) {
+    throw new Errors.VerificationFailedError({
+      reason: 'Memo challenge nonce does not match — possible replay',
+    });
+  }
+
+  // ── 4. Verify token transfers (amount + recipient + splits) ──
+  const tokenTransfers: {
+    token_id: string;
+    account: string;
+    amount: number;
+  }[] = tx.token_transfers ?? [];
+
+  const splits = (credential.challenge.request as any).splits as
+    Array<{recipient: string; amount: string; memo?: string}> | undefined;
+
+  // Calculate expected primary recipient amount
+  const primaryAmount = splits?.length
+    ? BigInt(amount) - splits.reduce((sum, s) => sum + BigInt(s.amount), 0n)
+    : BigInt(amount);
+
+  // Verify primary recipient credit
+  const primaryCredit = tokenTransfers.find(
+    (t) =>
+      t.token_id === tokenId &&
+      t.account === recipient &&
+      BigInt(t.amount) >= primaryAmount,
+  );
+
+  if (!primaryCredit) {
+    throw new Errors.VerificationFailedError({
+      reason: `No matching token transfer: expected ${primaryAmount} of ${tokenId} to ${recipient}`,
+    });
+  }
+
+  // Verify each split recipient credit
+  if (splits?.length) {
+    for (const split of splits) {
+      const splitCredit = tokenTransfers.find(
         (t) =>
           t.token_id === tokenId &&
-          t.account === recipient &&
-          BigInt(t.amount) >= BigInt(amount),
+          t.account === split.recipient &&
+          BigInt(t.amount) >= BigInt(split.amount),
       );
 
-      if (!matchingCredit) {
+      if (!splitCredit) {
         throw new Errors.VerificationFailedError({
-          reason: `No matching token transfer: expected ${amount} of ${tokenId} to ${recipient}`,
+          reason: `No matching split transfer: expected ${split.amount} of ${tokenId} to ${split.recipient}`,
         });
       }
+    }
+  }
 
-      // ── 5. Mark as used ──────────────────────────────────────────
-      await store.set(storeKey, Date.now());
+  // ── 5. Mark as used ──────────────────────────────────────────
+  await store.set(storeKey, Date.now());
 
-      return Receipt.from({
-        method: 'hedera',
-        reference: transactionId,
-        status: 'success',
-        timestamp: new Date().toISOString(),
-      });
-    },
+  return Receipt.from({
+    method: 'hedera',
+    reference: transactionId,
+    status: 'success',
+    timestamp: new Date().toISOString(),
+  });
+}
+
+// ─── Pull mode verification (server submits client-signed tx) ─────
+
+async function verifyPullMode(
+  credential: any,
+  config: HederaChargeServerOptions,
+  store: Store.Store,
+  serverId: string,
+  getHederaClient: () => InstanceType<typeof HederaClient>,
+) {
+  const { transaction: base64Tx } = credential.payload;
+
+  // ── 1. Decode the base64 transaction bytes ───────────────────
+  const txBytes = Buffer.from(base64Tx, 'base64');
+  const tx = Transaction.fromBytes(txBytes);
+
+  // ── 2. Verify the memo contains valid Attribution challenge binding ──
+  const memo = (tx as any).transactionMemo ?? '';
+  if (!memo || !memo.startsWith('0x')) {
+    throw new Errors.VerificationFailedError({
+      reason: 'Transaction memo is not a valid MPP attribution memo',
+    });
+  }
+
+  const memoHex = memo as `0x${string}`;
+
+  if (!Attribution.isMppMemo(memoHex)) {
+    throw new Errors.VerificationFailedError({
+      reason: 'Transaction memo is not a valid MPP attribution memo',
+    });
+  }
+
+  if (!Attribution.verifyServer(memoHex, serverId)) {
+    throw new Errors.VerificationFailedError({
+      reason: 'Memo server fingerprint does not match',
+    });
+  }
+
+  const challengeId = credential.challenge.id as string;
+  if (!Attribution.verifyChallengeBinding(memoHex, challengeId)) {
+    throw new Errors.VerificationFailedError({
+      reason: 'Memo challenge nonce does not match — possible replay',
+    });
+  }
+
+  // ── 3. Submit to Hedera network ──────────────────────────────
+  const client = getHederaClient();
+  const response = await tx.execute(client);
+  const receipt = await response.getReceipt(client);
+
+  if (receipt.status.toString() !== 'SUCCESS') {
+    throw new Errors.VerificationFailedError({
+      reason: `Hedera transaction failed: ${receipt.status}`,
+    });
+  }
+
+  const transactionId = response.transactionId.toString();
+
+  // ── 4. Mark as used ──────────────────────────────────────────
+  const storeKey = `hedera:charge:${transactionId}`;
+  await store.set(storeKey, Date.now());
+
+  return Receipt.from({
+    method: 'hedera',
+    reference: transactionId,
+    status: 'success',
+    timestamp: new Date().toISOString(),
   });
 }
 

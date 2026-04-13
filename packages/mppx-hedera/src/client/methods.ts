@@ -16,10 +16,16 @@ export const chargeMethod = Method.from({
   intent: 'charge',
   schema: {
     credential: {
-      payload: z.object({
-        transactionId: z.string(),
-        type: z.literal('hash'),
-      }),
+      payload: z.discriminatedUnion('type', [
+        z.object({
+          type: z.literal('hash'),
+          transactionId: z.string(),
+        }),
+        z.object({
+          type: z.literal('transaction'),
+          transaction: z.string(), // base64-encoded serialized signed Hedera tx bytes
+        }),
+      ]),
     },
     request: z.pipe(
       z.object({
@@ -29,13 +35,26 @@ export const chargeMethod = Method.from({
         recipient: z.string(),
         chainId: z.optional(z.number()),
         description: z.optional(z.string()),
+        externalId: z.optional(z.string()),
+        splits: z.optional(z.array(z.object({
+          recipient: z.string(),
+          amount: z.amount(),
+          memo: z.optional(z.string()),
+        })).min(1).max(10)),
       }),
-      z.transform(({ amount, decimals, chainId, ...rest }) => ({
+      z.transform(({ amount, decimals, chainId, externalId, splits, ...rest }) => ({
         ...rest,
         amount: parseUnits(amount, decimals).toString(),
+        ...(externalId !== undefined && { externalId }),
         ...(chainId !== undefined
           ? { methodDetails: { chainId } }
           : {}),
+        ...(splits !== undefined && {
+          splits: splits.map(s => ({
+            ...s,
+            amount: parseUnits(s.amount, decimals).toString(),
+          })),
+        }),
       })),
     ),
   },
