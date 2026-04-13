@@ -30,6 +30,12 @@ export interface HederaChargeClientOptions {
   network?: 'testnet' | 'mainnet';
   /** Optional client identity for the attribution memo. */
   clientId?: string;
+  /**
+   * Payment mode:
+   * - 'push' (default): client executes the tx and returns the transaction ID.
+   * - 'pull': client freezes + signs the tx, serializes to base64, and the server submits it.
+   */
+  mode?: 'push' | 'pull';
 }
 
 /**
@@ -53,6 +59,7 @@ export function charge(config: HederaChargeClientOptions) {
     operatorKey,
     network = 'testnet',
     clientId,
+    mode = 'push',
   } = config;
 
   // Parse key — supports hex (with or without 0x prefix) and DER
@@ -71,6 +78,17 @@ export function charge(config: HederaChargeClientOptions) {
 
       const amount = Number(BigInt(req.amount));
       const recipient = req.recipient as string; // expects "0.0.XXXX" format
+      const splits = req.splits as Array<{recipient: string; amount: string; memo?: string}> | undefined;
+
+      // Calculate primary recipient amount (total minus splits)
+      let primaryAmount = amount;
+      if (splits?.length) {
+        const splitTotal = splits.reduce((sum, s) => sum + Number(BigInt(s.amount)), 0);
+        primaryAmount = amount - splitTotal;
+        if (primaryAmount <= 0) {
+          throw new Error('Split amounts exceed or equal the total charge amount');
+        }
+      }
 
       // Build Attribution memo (same layout as Tempo)
       const serverId = (challenge as any).realm ?? 'hedera-mpp';
@@ -86,21 +104,39 @@ export function charge(config: HederaChargeClientOptions) {
         : HederaClient.forTestnet();
       client.setOperator(AccountId.fromString(operatorId), key);
 
-      // Build and execute native TransferTransaction with memo
-      const tx = new TransferTransaction()
-        .addTokenTransfer(
-          TokenId.fromString(tokenId),
-          AccountId.fromString(operatorId),
-          -amount,
-        )
-        .addTokenTransfer(
-          TokenId.fromString(tokenId),
-          AccountId.fromString(recipient),
-          amount,
-        )
-        .setTransactionMemo(memo)
-        .freezeWith(client);
+      // Build native TransferTransaction — debits and credits must sum to zero
+      const tx = new TransferTransaction();
+      const token = TokenId.fromString(tokenId);
 
+      // Debit payer for full amount
+      tx.addTokenTransfer(token, AccountId.fromString(operatorId), -amount);
+      // Credit primary recipient
+      tx.addTokenTransfer(token, AccountId.fromString(recipient), primaryAmount);
+      // Credit each split recipient
+      if (splits?.length) {
+        for (const split of splits) {
+          tx.addTokenTransfer(token, AccountId.fromString(split.recipient), Number(BigInt(split.amount)));
+        }
+      }
+
+      tx.setTransactionMemo(memo).freezeWith(client);
+
+      // ── Pull mode: sign + serialize, do NOT execute ──────────────
+      if (mode === 'pull') {
+        const signed = await tx.sign(key);
+        const txBytes = signed.toBytes();
+        const base64Tx = Buffer.from(txBytes).toString('base64');
+
+        client.close();
+
+        return Credential.serialize({
+          challenge,
+          payload: { transaction: base64Tx, type: 'transaction' as const },
+          source: `did:pkh:hedera:${network}:${operatorId}`,
+        });
+      }
+
+      // ── Push mode (default): execute and return tx ID ────────────
       const response = await tx.execute(client);
       const receipt = await response.getReceipt(client);
 
