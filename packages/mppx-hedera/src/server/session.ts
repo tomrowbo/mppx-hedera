@@ -234,9 +234,10 @@ export function session(params: HederaSessionServerOptions) {
   }
 
   async function getOnChainChannel(
+    client: PublicClient,
     channelId: Hex,
   ) {
-    return publicClient.readContract({
+    return client.readContract({
       address: escrowContract,
       abi: HEDERA_STREAM_CHANNEL_ABI,
       functionName: 'getChannel',

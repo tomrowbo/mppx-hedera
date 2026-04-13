@@ -214,7 +214,7 @@ async function verifyPushMode(
   }
 
   // ── 5. Mark as used ──────────────────────────────────────────
-  await store.set(storeKey, Date.now());
+  await store.put(storeKey, Date.now());
 
   return Receipt.from({
     method: 'hedera',
@@ -283,7 +283,7 @@ async function verifyPullMode(
 
   // ── 4. Mark as used ──────────────────────────────────────────
   const storeKey = `hedera:charge:${transactionId}`;
-  await store.set(storeKey, Date.now());
+  await store.put(storeKey, Date.now());
 
   return Receipt.from({
     method: 'hedera',
