@@ -24,6 +24,9 @@
   "scripts": {
     "build": "tsup",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:legacy": "for f in test/*.test.mjs; do node \"$f\"; done",
     "prepublishOnly": "pnpm build"
   },
   "keywords": [
@@ -51,6 +54,7 @@
     "tsup": "^8.5.1",
     "typescript": "latest",
     "viem": "latest",
+    "vitest": "^4.1.4",
     "zod": "latest"
   }
 }
