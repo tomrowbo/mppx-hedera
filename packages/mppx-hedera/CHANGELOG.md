@@ -1,5 +1,28 @@
 # mppx-hedera
 
+## 0.2.0
+
+### Breaking changes
+- Charge client now uses `@hashgraph/sdk` (native Hedera transactions) instead of viem ERC-20 transfers
+- Charge credential payload changed from `{ txHash }` to `{ transactionId, type: "hash" }` or `{ transaction, type: "transaction" }`
+- Client options changed: `walletClient` replaced with `operatorId` + `operatorKey` + `network`
+- `@hashgraph/sdk` is now a peer dependency
+
+### New features
+- **Attribution memo** — challenge-bound replay protection using same 32-byte layout as Tempo
+- **Pull mode** — client signs, server broadcasts (`type: "transaction"`)
+- **Splits** — up to 10 recipients per charge, atomic multi-transfer
+- **SSE transport** — metered streaming for session payments (LLM token billing)
+- **externalId** — merchant reference field in charge request
+- **Server defaults** — `request()` hook enriches challenges with chainId, recipient, currency
+- **Dependency injection** — session server accepts `getClients` for testing
+
+### Testing
+- 217 tests: 45 vitest (mocked) + 144 legacy unit + 19 testnet E2E + 9 mainnet E2E
+- Full mppx HTTP round-trip tests (Mppx.create → 402 → credential → verify → 200)
+- Concurrency tests (50 parallel vouchers, race conditions)
+- Real Hedera mainnet E2E with Circle USDC, verified on Hashscan
+
 ## 0.1.4
 
 - Redeployed contracts with full Sourcify verification (both testnet + mainnet)
