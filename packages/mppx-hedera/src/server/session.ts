@@ -127,6 +127,11 @@ export interface HederaSessionServerOptions {
   rpcUrl?: string;
   /** Store backend for channel state. Defaults to Store.memory(). */
   store?: Store.Store;
+  /** Optional client factory for dependency injection (testing). If omitted, real viem clients are created. */
+  getClients?: (chainId: number) => {
+    publicClient: PublicClient;
+    walletClient: WalletClient<Transport, any, Account>;
+  };
 }
 
 async function verifyVoucherSig(
@@ -224,6 +229,8 @@ export function session(params: HederaSessionServerOptions) {
   );
 
   function buildClients(chainId: number) {
+    if (params.getClients) return params.getClients(chainId);
+
     const chain = resolveChain(chainId);
     const rpcTransport = http(rpcUrl ?? chain.rpcUrls.default.http[0]);
 
