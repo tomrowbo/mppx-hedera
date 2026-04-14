@@ -273,20 +273,89 @@ async function verifyPullMode(
     });
   }
 
-  // ── 3. Submit to Hedera network ──────────────────────────────
-  const client = getHederaClient();
-  const response = await tx.execute(client);
-  const receipt = await response.getReceipt(client);
-
-  if (receipt.status.toString() !== 'SUCCESS') {
+  // ── 3. Idempotency: hash the tx bytes to prevent replay ──────
+  const txHash = Buffer.from(txBytes).toString('hex').slice(0, 64);
+  const preStoreKey = `hedera:charge:pull:${txHash}`;
+  const preSeen = await store.get(preStoreKey);
+  if (preSeen !== null) {
     throw new Errors.VerificationFailedError({
-      reason: `Hedera transaction failed: ${receipt.status}`,
+      reason: 'Transaction bytes already submitted',
+    });
+  }
+  await store.put(preStoreKey, Date.now());
+
+  // ── 4. Submit to Hedera network ──────────────────────────────
+  const client = getHederaClient();
+  let response;
+  try {
+    response = await tx.execute(client);
+  } catch (e: any) {
+    // Release the pre-reservation on submission failure
+    await store.delete(preStoreKey);
+    throw new Errors.VerificationFailedError({
+      reason: `Hedera transaction submission failed: ${e.message}`,
+    });
+  }
+
+  const txReceipt = await response.getReceipt(client);
+
+  if (txReceipt.status.toString() !== 'SUCCESS') {
+    throw new Errors.VerificationFailedError({
+      reason: `Hedera transaction failed: ${txReceipt.status}`,
     });
   }
 
   const transactionId = response.transactionId.toString();
 
-  // ── 4. Mark as used ──────────────────────────────────────────
+  // ── 5. Verify transfer amounts via Mirror Node ────────────────
+  const { amount, chainId: rawChainId, recipient } = credential.challenge.request;
+  const chainId = rawChainId ?? credential.challenge.request.methodDetails?.chainId;
+  const tokenId = DEFAULT_TOKEN_ID[chainId];
+  const mirrorNodeUrl = config.mirrorNodeUrl ?? resolveMirrorNode(chainId);
+  const urlTxId = formatTxIdForMirrorNode(transactionId);
+
+  const mirrorTx = await fetchTransaction(mirrorNodeUrl, urlTxId, 10, 2000);
+
+  const tokenTransfers: { token_id: string; account: string; amount: number }[] =
+    mirrorTx.token_transfers ?? [];
+
+  const splits = (credential.challenge.request as any).splits as
+    Array<{ recipient: string; amount: string }> | undefined;
+
+  const primaryAmount = splits?.length
+    ? BigInt(amount) - splits.reduce((sum: bigint, s: any) => sum + BigInt(s.amount), 0n)
+    : BigInt(amount);
+
+  const primaryCredit = tokenTransfers.find(
+    (t) =>
+      t.token_id === tokenId &&
+      t.account === recipient &&
+      BigInt(t.amount) >= primaryAmount,
+  );
+
+  if (!primaryCredit) {
+    throw new Errors.VerificationFailedError({
+      reason: `Pull mode: no matching token transfer for ${primaryAmount} of ${tokenId} to ${recipient}`,
+    });
+  }
+
+  if (splits?.length) {
+    for (const split of splits) {
+      const splitCredit = tokenTransfers.find(
+        (t) =>
+          t.token_id === tokenId &&
+          t.account === split.recipient &&
+          BigInt(t.amount) >= BigInt(split.amount),
+      );
+      if (!splitCredit) {
+        throw new Errors.VerificationFailedError({
+          reason: `Pull mode: no matching split transfer for ${split.amount} to ${split.recipient}`,
+        });
+      }
+    }
+  }
+
+  // ── 6. Mark transaction ID as used ────────────────────────────
   const storeKey = `hedera:charge:${transactionId}`;
   await store.put(storeKey, Date.now());
 

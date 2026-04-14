@@ -104,55 +104,55 @@ export function charge(config: HederaChargeClientOptions) {
         : HederaClient.forTestnet();
       client.setOperator(AccountId.fromString(operatorId), key);
 
-      // Build native TransferTransaction — debits and credits must sum to zero
-      const tx = new TransferTransaction();
-      const token = TokenId.fromString(tokenId);
+      try {
+        // Build native TransferTransaction — debits and credits must sum to zero
+        const tx = new TransferTransaction();
+        const token = TokenId.fromString(tokenId);
 
-      // Debit payer for full amount
-      tx.addTokenTransfer(token, AccountId.fromString(operatorId), -amount);
-      // Credit primary recipient
-      tx.addTokenTransfer(token, AccountId.fromString(recipient), primaryAmount);
-      // Credit each split recipient
-      if (splits?.length) {
-        for (const split of splits) {
-          tx.addTokenTransfer(token, AccountId.fromString(split.recipient), Number(BigInt(split.amount)));
+        // Debit payer for full amount
+        tx.addTokenTransfer(token, AccountId.fromString(operatorId), -amount);
+        // Credit primary recipient
+        tx.addTokenTransfer(token, AccountId.fromString(recipient), primaryAmount);
+        // Credit each split recipient
+        if (splits?.length) {
+          for (const split of splits) {
+            tx.addTokenTransfer(token, AccountId.fromString(split.recipient), Number(BigInt(split.amount)));
+          }
         }
-      }
 
-      tx.setTransactionMemo(memo).freezeWith(client);
+        tx.setTransactionMemo(memo).freezeWith(client);
 
-      // ── Pull mode: sign + serialize, do NOT execute ──────────────
-      if (mode === 'pull') {
-        const signed = await tx.sign(key);
-        const txBytes = signed.toBytes();
-        const base64Tx = Buffer.from(txBytes).toString('base64');
+        // ── Pull mode: sign + serialize, do NOT execute ──────────────
+        if (mode === 'pull') {
+          const signed = await tx.sign(key);
+          const txBytes = signed.toBytes();
+          const base64Tx = Buffer.from(txBytes).toString('base64');
 
-        client.close();
+          return Credential.serialize({
+            challenge,
+            payload: { transaction: base64Tx, type: 'transaction' as const },
+            source: `did:pkh:hedera:${network}:${operatorId}`,
+          });
+        }
+
+        // ── Push mode (default): execute and return tx ID ────────────
+        const response = await tx.execute(client);
+        const receipt = await response.getReceipt(client);
+
+        if (receipt.status.toString() !== 'SUCCESS') {
+          throw new Error(`Hedera transaction failed: ${receipt.status}`);
+        }
+
+        const transactionId = response.transactionId.toString();
 
         return Credential.serialize({
           challenge,
-          payload: { transaction: base64Tx, type: 'transaction' as const },
+          payload: { transactionId, type: 'hash' as const },
           source: `did:pkh:hedera:${network}:${operatorId}`,
         });
+      } finally {
+        client.close();
       }
-
-      // ── Push mode (default): execute and return tx ID ────────────
-      const response = await tx.execute(client);
-      const receipt = await response.getReceipt(client);
-
-      if (receipt.status.toString() !== 'SUCCESS') {
-        throw new Error(`Hedera transaction failed: ${receipt.status}`);
-      }
-
-      const transactionId = response.transactionId.toString();
-
-      client.close();
-
-      return Credential.serialize({
-        challenge,
-        payload: { transactionId, type: 'hash' as const },
-        source: `did:pkh:hedera:${network}:${operatorId}`,
-      });
     },
   });
 }
