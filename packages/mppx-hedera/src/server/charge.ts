@@ -119,7 +119,12 @@ async function verifyPushMode(
   retryDelay: number,
 ) {
   const { transactionId } = credential.payload;
-  const { amount, chainId, recipient } = credential.challenge.request;
+  const { amount, recipient } = credential.challenge.request;
+  // chainId may live at top level (raw request) or inside methodDetails
+  // (after the schema z.transform moves it there for the wire format).
+  const chainId =
+    credential.challenge.request.chainId ??
+    credential.challenge.request.methodDetails?.chainId;
   const tokenId = DEFAULT_TOKEN_ID[chainId];
 
   const mirrorNodeUrl =
