@@ -1,15 +1,15 @@
 /**
- * Session E2E on MAINNET — real Circle USDC, real escrow contract.
+ * Session E2E on MAINNET — real Circle USDC, full lifecycle including CLOSE.
  *
- * Full lifecycle: approve → open channel → voucher × 3
- * Cost: ~0.01 USDC deposit (refunded minus vouchers on close)
+ * approve → open → voucher × 3 → CLOSE → finality check
+ * Cost: ~0.01 USDC deposit (settled on close)
  *
  * Usage: node test/e2e-session-mainnet.test.mjs
  */
 
 import { Mppx } from 'mppx/server';
 import { Challenge, Credential, Receipt } from 'mppx';
-import { createWalletClient, createPublicClient, http } from 'viem';
+import { createWalletClient, http } from 'viem';
 import { privateKeyToAccount } from 'viem/accounts';
 
 const serverMod = await import('../dist/server/index.js');
@@ -18,7 +18,14 @@ const rootMod = await import('../dist/index.js');
 
 const { hedera } = serverMod;
 const { hederaSession } = clientMod;
-const { hederaMainnet, HEDERA_STREAM_CHANNEL_MAINNET, USDC_MAINNET } = rootMod;
+const {
+  hederaMainnet,
+  HEDERA_STREAM_CHANNEL_MAINNET,
+  USDC_MAINNET,
+  VOUCHER_DOMAIN_NAME,
+  VOUCHER_DOMAIN_VERSION,
+  VOUCHER_TYPES,
+} = rootMod;
 
 // ─── Mainnet config ──────────────────────────────────────────────
 const OPERATOR_KEY = '0x532933e45b6429bb1a73a1f64e1d09e62c3154f2b0856308e2ba0e99f6352f5c';
@@ -38,10 +45,35 @@ function assert(condition, name) {
   else { console.log(`  ❌ ${name}`); failed++; }
 }
 
-async function testSessionMainnet() {
-  console.log('\n═══ MAINNET SESSION E2E: approve → open → voucher × 3 ═══');
+function decodeCredential(serialized) {
+  const b64 = serialized.replace('Payment ', '');
+  return JSON.parse(Buffer.from(b64, 'base64url').toString());
+}
 
-  console.log('  [1/6] Creating mppx server (mainnet)...');
+async function signCloseVoucher(channelId, cumulativeAmount) {
+  const walletClient = createWalletClient({
+    account: OPERATOR_ACCOUNT,
+    chain: hederaMainnet,
+    transport: http('https://mainnet.hashio.io/api'),
+  });
+  return walletClient.signTypedData({
+    account: OPERATOR_ACCOUNT,
+    domain: {
+      name: VOUCHER_DOMAIN_NAME,
+      version: VOUCHER_DOMAIN_VERSION,
+      chainId: 295,
+      verifyingContract: ESCROW,
+    },
+    types: VOUCHER_TYPES,
+    primaryType: 'Voucher',
+    message: { channelId, cumulativeAmount },
+  });
+}
+
+async function testSessionMainnet() {
+  console.log('\n═══ MAINNET SESSION E2E: approve → open → voucher × 3 → CLOSE ═══');
+
+  console.log('  [1/7] Creating mppx server (mainnet)...');
   const serverHandler = hedera.session({
     account: OPERATOR_ACCOUNT,
     recipient: PAYEE,
@@ -51,7 +83,7 @@ async function testSessionMainnet() {
     suggestedDeposit: '0.01',
     decimals: 6,
     unitType: 'request',
-    testnet: false, // MAINNET
+    testnet: false,
   });
 
   const mppx = Mppx.create({
@@ -61,28 +93,19 @@ async function testSessionMainnet() {
   });
 
   const route = mppx.session({
-    amount: '0.001',
-    currency: TOKEN,
-    decimals: 6,
-    unitType: 'request',
-    recipient: PAYEE,
-    suggestedDeposit: '0.01',
-    escrowContract: ESCROW,
+    amount: '0.001', currency: TOKEN, decimals: 6, unitType: 'request',
+    recipient: PAYEE, suggestedDeposit: '0.01', escrowContract: ESCROW,
   });
 
-  // Step 2: Get 402
-  console.log('  [2/6] GET → 402 challenge...');
+  // Step 2: 402
+  console.log('  [2/7] GET → 402...');
   const cr = await route(new Request(RESOURCE_URL));
   assert(cr.status === 402, `Got 402`);
   const challenge = Challenge.fromResponse(cr.challenge);
-  assert(challenge.method === 'hedera', `Method is hedera`);
   assert(challenge.intent === 'session', `Intent is session`);
-  console.log(`  Challenge: amount=${challenge.request.amount}, deposit=${challenge.request.suggestedDeposit}`);
 
-  // Step 3: Client opens channel (real mainnet USDC)
-  console.log('  [3/6] Client opening channel on MAINNET (approve + open)...');
-  console.log('        Real Circle USDC being deposited into escrow...');
-
+  // Step 3: Open (real mainnet)
+  console.log('  [3/7] Client opening channel on MAINNET (real Circle USDC)...');
   const clientHandler = hederaSession({
     account: OPERATOR_ACCOUNT,
     deposit: '0.01',
@@ -92,56 +115,86 @@ async function testSessionMainnet() {
   let openCred;
   try {
     openCred = await clientHandler.createCredential({ challenge });
-    assert(!!openCred, 'Client created open credential');
+    assert(!!openCred, 'Open credential created');
   } catch (e) {
-    console.log(`  ❌ Client open failed: ${e.message}`);
-    console.log(`  Stack: ${e.stack?.split('\n').slice(0, 4).join('\n')}`);
-    failed++;
+    assert(false, `Open failed: ${e.message}`);
     return;
   }
 
   // Step 4: Server verifies open
-  console.log('  [4/6] Server verifying open credential...');
+  console.log('  [4/7] Server verifying open...');
   const openResult = await route(new Request(RESOURCE_URL, {
     headers: { Authorization: openCred },
   }));
-
   assert(openResult.status === 200, `Open: got 200 (got ${openResult.status})`);
+  if (openResult.status !== 200) return;
 
-  if (openResult.status !== 200) {
-    console.log('  ⚠️  Open verification failed — cannot continue');
-    return;
-  }
-
-  const openResponse = openResult.withReceipt(new Response('opened'));
-  const openReceipt = Receipt.fromResponse(openResponse);
-  assert(openReceipt.method === 'hedera', `Receipt method=hedera`);
-  assert(openReceipt.status === 'success', `Receipt status=success`);
-  console.log(`  Channel: ${openReceipt.reference?.slice(0, 20)}...`);
+  const openParsed = decodeCredential(openCred);
+  const channelId = openParsed.payload.channelId;
+  console.log(`  Channel: ${channelId}`);
 
   // Step 5: 3 vouchers
-  console.log('  [5/6] Sending 3 voucher requests (off-chain)...');
+  console.log('  [5/7] 3 vouchers (off-chain)...');
   for (let i = 1; i <= 3; i++) {
     const vcr = await route(new Request(RESOURCE_URL));
     const vch = Challenge.fromResponse(vcr.challenge);
     const vcred = await clientHandler.createCredential({ challenge: vch });
-    const vresult = await route(new Request(RESOURCE_URL, {
-      headers: { Authorization: vcred },
-    }));
-    assert(vresult.status === 200, `Voucher ${i}: got 200`);
+    const vr = await route(new Request(RESOURCE_URL, { headers: { Authorization: vcred } }));
+    assert(vr.status === 200, `Voucher ${i}: got 200`);
   }
 
-  // Step 6: Summary
-  console.log('  [6/6] Mainnet session E2E summary:');
-  console.log('    - approve: ✅ (real Circle USDC on mainnet)');
-  console.log('    - open:    ✅ (USDC deposited into HederaStreamChannel)');
-  console.log('    - voucher: ✅ × 3 (off-chain EIP-712)');
-  console.log('    All verifiable on hashscan.io/mainnet');
+  // Step 6: CLOSE (real on-chain)
+  console.log('  [6/7] Closing channel on MAINNET (real on-chain settlement)...');
+  const finalCumulative = BigInt(challenge.request.amount) * 4n;
+  const closeSig = await signCloseVoucher(channelId, finalCumulative);
+
+  const closeCr = await route(new Request(RESOURCE_URL));
+  const closeCh = Challenge.fromResponse(closeCr.challenge);
+  const closeCred = Credential.from({
+    challenge: closeCh,
+    payload: {
+      action: 'close',
+      channelId,
+      cumulativeAmount: String(finalCumulative),
+      signature: closeSig,
+    },
+  });
+
+  const closeResult = await route(new Request(RESOURCE_URL, {
+    headers: { Authorization: Credential.serialize(closeCred) },
+  }));
+  assert(closeResult.status === 200, `Close: got 200 (got ${closeResult.status})`);
+
+  if (closeResult.status === 200) {
+    const closeResponse = closeResult.withReceipt(new Response('closed'));
+    const closeReceipt = Receipt.fromResponse(closeResponse);
+    assert(closeReceipt.method === 'hedera', `Close receipt method=hedera`);
+    assert(closeReceipt.status === 'success', `Close receipt status=success`);
+    console.log(`  Close tx: ${closeReceipt.reference}`);
+  }
+
+  // Step 7: Finality check
+  console.log('  [7/7] Verifying channel is finalized...');
+  const postCr = await route(new Request(RESOURCE_URL));
+  const postCh = Challenge.fromResponse(postCr.challenge);
+  const postVoucher = Credential.from({
+    challenge: postCh,
+    payload: {
+      action: 'voucher', channelId,
+      cumulativeAmount: String(finalCumulative + 1000n),
+      signature: await signCloseVoucher(channelId, finalCumulative + 1000n),
+    },
+  });
+  const postResult = await route(new Request(RESOURCE_URL, {
+    headers: { Authorization: Credential.serialize(postVoucher) },
+  }));
+  assert(postResult.status === 402, `Post-close rejected with 402`);
 }
 
 async function main() {
-  console.log('mppx-hedera — MAINNET Session End-to-End Test');
-  console.log('Real mppx server + real Hedera MAINNET + real Circle USDC\n');
+  console.log('mppx-hedera — MAINNET Session E2E');
+  console.log('Full lifecycle: approve → open → voucher × 3 → CLOSE → finality');
+  console.log('Real Circle USDC on Hedera mainnet\n');
 
   await testSessionMainnet();
 
