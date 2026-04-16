@@ -12,7 +12,8 @@ import {
   createWalletClient,
   type Hex,
   http,
-  isAddressEqual,
+  // Note: isAddressEqual from viem rejects Hedera long-zero addresses (>20 bytes).
+  // Use addressEqual() below instead.
   type PublicClient,
   parseUnits,
   type Transport,
@@ -30,6 +31,11 @@ import {
   VOUCHER_TYPES,
 } from '../constants.js';
 import { assertUint128, resolveChain, hederaTestnet, hederaMainnet } from '../internal.js';
+
+/** Case-insensitive address comparison that handles Hedera long-zero addresses (>20 bytes). */
+function addressEqual(a: string, b: string): boolean {
+  return a.toLowerCase() === b.toLowerCase();
+}
 
 interface VoucherRecord {
   channelId: Hex;
@@ -264,10 +270,11 @@ export function session(params: HederaSessionServerOptions) {
     } as Record<string, unknown>,
 
     async request({ request }) {
+      const md = request.methodDetails ?? {};
       return {
         ...request,
-        chainId: request.chainId ?? defaultChain.id,
-        escrowContract: request.escrowContract ?? escrowContract,
+        chainId: request.chainId ?? md.chainId ?? defaultChain.id,
+        escrowContract: request.escrowContract ?? md.escrowContract ?? escrowContract,
       };
     },
 
@@ -278,8 +285,11 @@ export function session(params: HederaSessionServerOptions) {
       credential: Record<string, unknown>;
       request: Record<string, unknown>;
     }) {
+      const md = (request.methodDetails ?? {}) as Record<string, unknown>;
       const chainId =
-        (request.chainId as number | undefined) ?? defaultChain.id;
+        (request.chainId as number | undefined) ??
+        (md.chainId as number | undefined) ??
+        defaultChain.id;
       const { publicClient, walletClient } = buildClients(chainId);
 
       const payload = credential.payload as Record<string, unknown>;
@@ -318,18 +328,18 @@ export function session(params: HederaSessionServerOptions) {
             throw new Errors.ChannelClosedError({
               reason: 'channel has a pending close request',
             });
-          if (!isAddressEqual(onChain.payee, recipient)) {
+          if (!addressEqual(onChain.payee, recipient)) {
             throw new Errors.VerificationFailedError({
               reason: 'on-chain payee mismatch',
             });
           }
-          if (!isAddressEqual(onChain.token, currency)) {
+          if (!addressEqual(onChain.token, currency)) {
             throw new Errors.VerificationFailedError({
               reason: 'on-chain token mismatch',
             });
           }
 
-          const authorizedSigner = isAddressEqual(
+          const authorizedSigner = addressEqual(
             onChain.authorizedSigner,
             zeroAddress,
           )

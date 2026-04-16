@@ -529,10 +529,56 @@ describe('client/charge — error paths', () => {
     }
   });
 
-  it.skip('client.close() is called on error (try/finally)', async () => {
-    // This test would require intercepting the HederaClient instance
-    // created inside createCredential to verify .close() is called.
-    // Since the client is created locally and not injectable, this
-    // requires deeper module mocking that is fragile. Skipping for now.
+  it('client.close() is called on error (try/finally)', async () => {
+    // The @hashgraph/sdk Client mock is already set up at module level.
+    // We need to import the CLIENT charge (not server charge) and mock
+    // the TransferTransaction to throw during execute.
+    const { charge: clientCharge } = await import('../src/client/charge.js');
+
+    // Track close calls on the mock client
+    const mockClose = vi.fn();
+    const mockSetOperator = vi.fn();
+    (HederaClient.forTestnet as any).mockReturnValue({
+      setOperator: mockSetOperator,
+      close: mockClose,
+    });
+
+    // Mock TransferTransaction to throw on execute
+    const { TransferTransaction } = await import('@hashgraph/sdk');
+    const mockTxInstance = {
+      addTokenTransfer: vi.fn().mockReturnThis(),
+      setTransactionMemo: vi.fn().mockReturnThis(),
+      freezeWith: vi.fn().mockReturnThis(),
+      execute: vi.fn().mockRejectedValue(new Error('Network error')),
+    };
+    vi.spyOn(TransferTransaction.prototype, 'addTokenTransfer').mockReturnThis();
+    vi.spyOn(TransferTransaction.prototype, 'setTransactionMemo').mockReturnThis();
+    vi.spyOn(TransferTransaction.prototype, 'freezeWith').mockReturnThis();
+    vi.spyOn(TransferTransaction.prototype, 'execute').mockRejectedValue(new Error('Network error'));
+
+    const handler = clientCharge({
+      operatorId: '0.0.12345',
+      operatorKey: '0x' + 'ab'.repeat(32),
+      network: 'testnet',
+      mode: 'push',
+    });
+
+    const challenge = {
+      id: CHALLENGE_ID,
+      realm: SERVER_ID,
+      request: {
+        amount: '1000',
+        currency: TOKEN_ID,
+        recipient: RECIPIENT,
+        methodDetails: { chainId: CHAIN_ID },
+      },
+    };
+
+    await expect(
+      handler.createCredential({ challenge } as any),
+    ).rejects.toThrow('Network error');
+
+    // The key assertion: close() was called despite the error
+    expect(mockClose).toHaveBeenCalled();
   });
 });
