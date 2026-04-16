@@ -279,4 +279,85 @@ describe('mppx session HTTP round-trip', () => {
     // Expired challenge → new 402
     expect(result.status).toBe(402);
   });
+
+  it('open returns response with Payment-Receipt header', async () => {
+    const { route } = createServer();
+
+    // Get challenge
+    const cr = await route(new Request(RESOURCE_URL));
+    const ch = Challenge.fromResponse(cr.challenge);
+
+    // Build open credential
+    const cred = Credential.from({
+      challenge: ch,
+      payload: {
+        action: 'open' as const,
+        channelId: CHANNEL_ID,
+        cumulativeAmount: String(BigInt(ch.request.amount)),
+        signature: `0x${'ff'.repeat(65)}`,
+        txHash: `0x${'aa'.repeat(32)}`,
+      },
+    });
+
+    const result = await route(new Request(RESOURCE_URL, {
+      headers: { Authorization: Credential.serialize(cred) },
+    }));
+
+    expect(result.status).toBe(200);
+
+    // withReceipt should attach Payment-Receipt header
+    const response = result.withReceipt(new Response('OK'));
+    const receiptHeader = response.headers.get('Payment-Receipt');
+    expect(receiptHeader).toBeTruthy();
+  });
+
+  it('duplicate voucher with same cumulative is idempotent (not rejected)', async () => {
+    const { route } = createServer();
+
+    // Open channel
+    const cr1 = await route(new Request(RESOURCE_URL));
+    const ch1 = Challenge.fromResponse(cr1.challenge);
+    const openCred = Credential.from({
+      challenge: ch1,
+      payload: {
+        action: 'open' as const,
+        channelId: CHANNEL_ID,
+        cumulativeAmount: String(BigInt(ch1.request.amount)),
+        signature: `0x${'ff'.repeat(65)}`,
+        txHash: `0x${'aa'.repeat(32)}`,
+      },
+    });
+    await route(new Request(RESOURCE_URL, {
+      headers: { Authorization: Credential.serialize(openCred) },
+    }));
+
+    // Send same voucher amount twice — second should be idempotent (return existing receipt)
+    const cr2 = await route(new Request(RESOURCE_URL));
+    const ch2 = Challenge.fromResponse(cr2.challenge);
+    const voucherCred = Credential.from({
+      challenge: ch2,
+      payload: {
+        action: 'voucher' as const,
+        channelId: CHANNEL_ID,
+        cumulativeAmount: String(BigInt(ch1.request.amount)), // same as open
+        signature: `0x${'dd'.repeat(65)}`,
+      },
+    });
+
+    const result = await route(new Request(RESOURCE_URL, {
+      headers: { Authorization: Credential.serialize(voucherCred) },
+    }));
+    // Session vouchers with lower/equal cumulative return existing receipt, not error
+    expect(result.status).toBe(200);
+  });
+
+  it('malformed session credential returns 402', async () => {
+    const { route } = createServer();
+
+    const result = await route(new Request(RESOURCE_URL, {
+      headers: { Authorization: 'Payment not-valid-base64-json' },
+    }));
+
+    expect(result.status).toBe(402);
+  });
 });
