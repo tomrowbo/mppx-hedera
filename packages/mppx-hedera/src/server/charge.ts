@@ -17,7 +17,7 @@ import {
   Client as HederaClient,
   AccountId,
   PrivateKey,
-} from '@hashgraph/sdk';
+} from '@hiero-ledger/sdk';
 import { chargeMethod } from '../client/methods.js';
 import { resolveMirrorNode, formatTxIdForMirrorNode } from '../internal.js';
 import { DEFAULT_TOKEN_ID } from '../constants.js';

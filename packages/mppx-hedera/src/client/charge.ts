@@ -16,7 +16,7 @@ import {
   AccountId,
   TokenId,
   PrivateKey,
-} from '@hashgraph/sdk';
+} from '@hiero-ledger/sdk';
 import { chargeMethod } from './methods.js';
 import { DEFAULT_TOKEN_ID } from '../constants.js';
 import * as Attribution from '../attribution.js';

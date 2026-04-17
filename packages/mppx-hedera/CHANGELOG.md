@@ -3,10 +3,10 @@
 ## 0.2.0
 
 ### Breaking changes
-- Charge client now uses `@hashgraph/sdk` (native Hedera transactions) instead of viem ERC-20 transfers
+- Charge client now uses `@hiero-ledger/sdk` (native Hedera transactions) instead of viem ERC-20 transfers
 - Charge credential payload changed from `{ txHash }` to `{ transactionId, type: "hash" }` or `{ transaction, type: "transaction" }`
 - Client options changed: `walletClient` replaced with `operatorId` + `operatorKey` + `network`
-- `@hashgraph/sdk` is now a peer dependency
+- `@hiero-ledger/sdk` is now a peer dependency
 
 ### New features
 - **Attribution memo** — challenge-bound replay protection using same 32-byte layout as Tempo

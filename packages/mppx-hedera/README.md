@@ -8,10 +8,10 @@ Native [Machine Payments Protocol](https://mpp.dev) method for [Hedera](https://
 ## Install
 
 ```bash
-npm install mppx-hedera mppx viem @hashgraph/sdk
+npm install mppx-hedera mppx viem @hiero-ledger/sdk
 ```
 
-`@hashgraph/sdk` and `viem` are peer dependencies. The charge intent uses the Hedera SDK for native token transfers. The session intent uses viem for EVM escrow contract interactions.
+`@hiero-ledger/sdk` and `viem` are peer dependencies. The charge intent uses the Hedera SDK for native token transfers. The session intent uses viem for EVM escrow contract interactions.
 
 ## Quick start -- Server
 
@@ -133,7 +133,7 @@ One-time payment per request. The client builds a native Hedera `TransferTransac
 Client  ->  POST /resource
 Server  ->  402 + WWW-Authenticate: Payment method="hedera"
 Client  ->  builds TransferTransaction with attribution memo
-Client  ->  executes via @hashgraph/sdk (push) or serializes (pull)
+Client  ->  executes via @hiero-ledger/sdk (push) or serializes (pull)
 Client  ->  retries with Authorization: Payment <credential>
 Server  ->  verifies via Mirror Node: memo binding + token transfers
 Server  ->  200 + Payment-Receipt header
@@ -321,7 +321,7 @@ Hashio (Hedera's JSON-RPC relay) underestimates gas for transactions involving t
 | ERC-20 `approve` | `1_000_000n` |
 | `escrow.open` / `settle` / `close` | `1_500_000n` |
 
-Charge intents bypass this entirely by using native Hedera `TransferTransaction` via `@hashgraph/sdk`.
+Charge intents bypass this entirely by using native Hedera `TransferTransaction` via `@hiero-ledger/sdk`.
 
 ### HTS token association
 

@@ -5,7 +5,7 @@
  * Strategy: since verifyPullMode is called via the Method.toServer handler,
  * we invoke the charge() factory with mocked config, then call the verify
  * function through the handler's verify path. We mock:
- *   - @hashgraph/sdk Transaction.fromBytes (vi.mock at module level)
+ *   - @hiero-ledger/sdk Transaction.fromBytes (vi.mock at module level)
  *   - globalThis.fetch (for Mirror Node requests)
  *   - Store (in-memory, real implementation)
  *
@@ -16,7 +16,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { Store, Errors } from 'mppx';
 import * as Attribution from '../src/attribution.js';
 
-// ── Mock @hashgraph/sdk at module level ─────────────────────────────
+// ── Mock @hiero-ledger/sdk at module level ─────────────────────────────
 // We intercept Transaction.fromBytes to return controllable mock objects.
 
 const mockExecute = vi.fn();
@@ -32,8 +32,8 @@ function createMockTx(memo: string) {
   };
 }
 
-vi.mock('@hashgraph/sdk', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@hashgraph/sdk')>();
+vi.mock('@hiero-ledger/sdk', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@hiero-ledger/sdk')>();
   return {
     ...actual,
     Transaction: {
@@ -56,7 +56,7 @@ vi.mock('@hashgraph/sdk', async (importOriginal) => {
 });
 
 // Import after mock so the mock takes effect
-import { Transaction, Client as HederaClient } from '@hashgraph/sdk';
+import { Transaction, Client as HederaClient } from '@hiero-ledger/sdk';
 import { charge } from '../src/server/charge.js';
 
 // ── Test constants ──────────────────────────────────────────────────
@@ -530,7 +530,7 @@ describe('client/charge — error paths', () => {
   });
 
   it('client.close() is called on error (try/finally)', async () => {
-    // The @hashgraph/sdk Client mock is already set up at module level.
+    // The @hiero-ledger/sdk Client mock is already set up at module level.
     // We need to import the CLIENT charge (not server charge) and mock
     // the TransferTransaction to throw during execute.
     const { charge: clientCharge } = await import('../src/client/charge.js');
@@ -544,7 +544,7 @@ describe('client/charge — error paths', () => {
     });
 
     // Mock TransferTransaction to throw on execute
-    const { TransferTransaction } = await import('@hashgraph/sdk');
+    const { TransferTransaction } = await import('@hiero-ledger/sdk');
     const mockTxInstance = {
       addTokenTransfer: vi.fn().mockReturnThis(),
       setTransactionMemo: vi.fn().mockReturnThis(),

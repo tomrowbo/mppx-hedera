@@ -6,7 +6,7 @@ Native [Machine Payments Protocol](https://mpp.dev) method for [Hedera](https://
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](packages/mppx-hedera/LICENSE)
 
 ```bash
-npm install mppx-hedera mppx viem @hashgraph/sdk
+npm install mppx-hedera mppx viem @hiero-ledger/sdk
 ```
 
 ## What is this

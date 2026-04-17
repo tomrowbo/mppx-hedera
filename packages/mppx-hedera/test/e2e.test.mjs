@@ -17,7 +17,7 @@ import {
   AccountId,
   TokenId,
   PrivateKey,
-} from '@hashgraph/sdk';
+} from '@hiero-ledger/sdk';
 
 // Import from BUILT SDK
 const serverMod = await import('../dist/server/index.js');
