@@ -304,8 +304,8 @@ for await (const event of Sse.iterateEvents(response)) {
 
 | Network | HederaStreamChannel | USDC (HTS) | Chain ID |
 |---|---|---|---|
-| Testnet | [`0x401b...4C3`](https://hashscan.io/testnet/contract/0x401b6dc30221823361E4876f5C502e37249D84C3) | `0.0.5449` | 296 |
-| Mainnet | [`0x401b...4C3`](https://hashscan.io/mainnet/contract/0x401b6dc30221823361E4876f5C502e37249D84C3) | `0.0.456858` (Circle) | 295 |
+| Testnet | [`0x8Aaf...daE`](https://hashscan.io/testnet/contract/0x8Aaf6690C2a6397d595F97E224fC19759De6fdaE) | `0.0.5449` | 296 |
+| Mainnet | [`0x8Aaf...daE`](https://hashscan.io/mainnet/contract/0x8Aaf6690C2a6397d595F97E224fC19759De6fdaE) | `0.0.456858` (Circle) | 295 |
 
 Both contracts are verified on [Hashscan](https://hashscan.io) via Sourcify. Same deterministic address on both networks. The escrow is a port of [Tempo's StreamChannel](https://github.com/tempoxyz/mpp-specs) with the EIP-712 domain set to `"Hedera Stream Channel"`.
 

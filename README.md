@@ -29,8 +29,8 @@ No facilitator. The server verifies directly against Hedera's Mirror Node REST A
 
 | Network | HederaStreamChannel | USDC |
 |---|---|---|
-| Mainnet | [`0x401b...4C3`](https://hashscan.io/mainnet/contract/0x401b6dc30221823361E4876f5C502e37249D84C3) | 0.0.456858 (Circle) |
-| Testnet | [`0x401b...4C3`](https://hashscan.io/testnet/contract/0x401b6dc30221823361E4876f5C502e37249D84C3) | 0.0.5449 |
+| Mainnet | [`0x8Aaf...daE`](https://hashscan.io/mainnet/contract/0x8Aaf6690C2a6397d595F97E224fC19759De6fdaE) | 0.0.456858 (Circle) |
+| Testnet | [`0x8Aaf...daE`](https://hashscan.io/testnet/contract/0x8Aaf6690C2a6397d595F97E224fC19759De6fdaE) | 0.0.5449 |
 
 Both fully verified on [Hashscan](https://hashscan.io) via Sourcify.
 

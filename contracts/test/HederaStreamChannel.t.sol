@@ -160,7 +160,7 @@ contract HederaStreamChannelTest is Test {
 
     function test_Open_RevertInvalidToken() public {
         vm.prank(payer);
-        vm.expectRevert("invalid token");
+        vm.expectRevert(IHederaStreamChannel.InvalidToken.selector);
         escrow.open(payee, address(0), 100e6, bytes32(0), address(0));
     }
 

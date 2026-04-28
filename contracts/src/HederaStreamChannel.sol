@@ -57,9 +57,9 @@ contract HederaStreamChannel is IHederaStreamChannel, EIP712 {
         if (payee == address(0)) {
             revert InvalidPayee();
         }
-        // Replace TempoUtilities.isTIP20(token) with a simple zero-address check.
-        // Any standard ERC-20 is valid — no TIP-20 interface detection required.
-        require(token != address(0), "invalid token");
+        if (token == address(0)) {
+            revert InvalidToken();
+        }
         if (deposit == 0) {
             revert ZeroDeposit();
         }
