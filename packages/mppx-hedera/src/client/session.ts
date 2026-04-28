@@ -233,6 +233,7 @@ export function hederaSession(options: HederaSessionClientOptions) {
             salt,
             zeroAddress,
           ],
+          gas: 1_500_000n, // HTS precompile needs higher gas
         });
         await publicClient.waitForTransactionReceipt({ hash: openTx });
 

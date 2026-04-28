@@ -195,6 +195,61 @@ export const HEDERA_STREAM_CHANNEL_ABI = [
       { name: 'newDeposit', type: 'uint256', indexed: false },
     ],
   },
+  {
+    name: 'CloseRequested',
+    type: 'event',
+    inputs: [
+      { name: 'channelId', type: 'bytes32', indexed: true },
+      { name: 'payer', type: 'address', indexed: true },
+      { name: 'payee', type: 'address', indexed: true },
+      { name: 'closeGraceEnd', type: 'uint256', indexed: false },
+    ],
+  },
+  {
+    name: 'CloseRequestCancelled',
+    type: 'event',
+    inputs: [
+      { name: 'channelId', type: 'bytes32', indexed: true },
+      { name: 'payer', type: 'address', indexed: true },
+      { name: 'payee', type: 'address', indexed: true },
+    ],
+  },
+  {
+    name: 'ChannelExpired',
+    type: 'event',
+    inputs: [
+      { name: 'channelId', type: 'bytes32', indexed: true },
+      { name: 'payer', type: 'address', indexed: true },
+      { name: 'payee', type: 'address', indexed: true },
+    ],
+  },
+  {
+    name: 'associateSelf',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [{ name: 'token', type: 'address' }],
+    outputs: [{ name: 'responseCode', type: 'int256' }],
+  },
+  {
+    name: 'getChannelsBatch',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'channelIds', type: 'bytes32[]' }],
+    outputs: [{
+      name: '',
+      type: 'tuple[]',
+      components: [
+        { name: 'finalized', type: 'bool' },
+        { name: 'closeRequestedAt', type: 'uint64' },
+        { name: 'payer', type: 'address' },
+        { name: 'payee', type: 'address' },
+        { name: 'token', type: 'address' },
+        { name: 'authorizedSigner', type: 'address' },
+        { name: 'deposit', type: 'uint128' },
+        { name: 'settled', type: 'uint128' },
+      ],
+    }],
+  },
 ] as const;
 
 /** EIP-712 domain name for session voucher signatures. */

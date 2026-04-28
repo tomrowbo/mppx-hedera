@@ -12,6 +12,7 @@
  */
 
 import { Errors, Method, Receipt, Store } from 'mppx';
+import { keccak256 } from 'viem';
 import {
   Transaction,
   Client as HederaClient,
@@ -186,35 +187,42 @@ async function verifyPushMode(
     ? BigInt(amount) - splits.reduce((sum, s) => sum + BigInt(s.amount), 0n)
     : BigInt(amount);
 
-  // Verify primary recipient credit
-  const primaryCredit = tokenTransfers.find(
-    (t) =>
+  // Verify primary recipient credit (track consumed indices to prevent
+  // a single Mirror Node entry from satisfying multiple payment legs)
+  const consumed = new Set<number>();
+
+  const primaryIdx = tokenTransfers.findIndex(
+    (t, i) =>
+      !consumed.has(i) &&
       t.token_id === tokenId &&
       t.account === recipient &&
       BigInt(t.amount) >= primaryAmount,
   );
 
-  if (!primaryCredit) {
+  if (primaryIdx === -1) {
     throw new Errors.VerificationFailedError({
       reason: `No matching token transfer: expected ${primaryAmount} of ${tokenId} to ${recipient}`,
     });
   }
+  consumed.add(primaryIdx);
 
   // Verify each split recipient credit
   if (splits?.length) {
     for (const split of splits) {
-      const splitCredit = tokenTransfers.find(
-        (t) =>
+      const splitIdx = tokenTransfers.findIndex(
+        (t, i) =>
+          !consumed.has(i) &&
           t.token_id === tokenId &&
           t.account === split.recipient &&
           BigInt(t.amount) >= BigInt(split.amount),
       );
 
-      if (!splitCredit) {
+      if (splitIdx === -1) {
         throw new Errors.VerificationFailedError({
           reason: `No matching split transfer: expected ${split.amount} of ${tokenId} to ${split.recipient}`,
         });
       }
+      consumed.add(splitIdx);
     }
   }
 
@@ -274,7 +282,7 @@ async function verifyPullMode(
   }
 
   // ── 3. Idempotency: hash the tx bytes to prevent replay ──────
-  const txHash = Buffer.from(txBytes).toString('hex').slice(0, 64);
+  const txHash = keccak256(txBytes);
   const preStoreKey = `hedera:charge:pull:${txHash}`;
   const preSeen = await store.get(preStoreKey);
   if (preSeen !== null) {
@@ -326,32 +334,40 @@ async function verifyPullMode(
     ? BigInt(amount) - splits.reduce((sum: bigint, s: any) => sum + BigInt(s.amount), 0n)
     : BigInt(amount);
 
-  const primaryCredit = tokenTransfers.find(
-    (t) =>
+  // Track consumed indices to prevent a single Mirror Node entry from
+  // satisfying multiple payment legs
+  const consumed = new Set<number>();
+
+  const primaryIdx = tokenTransfers.findIndex(
+    (t, i) =>
+      !consumed.has(i) &&
       t.token_id === tokenId &&
       t.account === recipient &&
       BigInt(t.amount) >= primaryAmount,
   );
 
-  if (!primaryCredit) {
+  if (primaryIdx === -1) {
     throw new Errors.VerificationFailedError({
       reason: `Pull mode: no matching token transfer for ${primaryAmount} of ${tokenId} to ${recipient}`,
     });
   }
+  consumed.add(primaryIdx);
 
   if (splits?.length) {
     for (const split of splits) {
-      const splitCredit = tokenTransfers.find(
-        (t) =>
+      const splitIdx = tokenTransfers.findIndex(
+        (t, i) =>
+          !consumed.has(i) &&
           t.token_id === tokenId &&
           t.account === split.recipient &&
           BigInt(t.amount) >= BigInt(split.amount),
       );
-      if (!splitCredit) {
+      if (splitIdx === -1) {
         throw new Errors.VerificationFailedError({
           reason: `Pull mode: no matching split transfer for ${split.amount} to ${split.recipient}`,
         });
       }
+      consumed.add(splitIdx);
     }
   }
 
@@ -394,12 +410,14 @@ async function fetchTransaction(
       continue;
     }
 
-    throw new Error(
-      `Mirror Node returned ${resp.status} for transaction ${urlTxId}`,
-    );
+    throw new Errors.VerificationFailedError({
+      reason: `Mirror Node returned ${resp.status} for transaction ${urlTxId}`,
+    });
   }
 
-  throw new Error(`Transaction ${urlTxId} not found after ${maxRetries} retries`);
+  throw new Errors.VerificationFailedError({
+    reason: `Transaction ${urlTxId} not found after ${maxRetries} retries`,
+  });
 }
 
 /**

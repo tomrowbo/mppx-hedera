@@ -60,6 +60,7 @@ export interface ReceiptPayload {
   intent: 'session';
   status: 'success';
   timestamp: string;
+  reference: string;
   channelId: `0x${string}`;
   acceptedCumulative: string;
   spent: string;
@@ -285,6 +286,7 @@ export function serve(
               intent: 'session',
               status: 'success',
               timestamp: new Date().toISOString(),
+              reference: channelId,
               channelId,
               acceptedCumulative: BigInt(
                 channel.highestVoucherAmount,

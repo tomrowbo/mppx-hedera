@@ -58,6 +58,7 @@ interface ChannelState {
   spent: bigint;
   units: number;
   finalized: boolean;
+  closeRequestedAt: bigint;
   createdAt: string;
 }
 
@@ -339,6 +340,13 @@ export function session(params: HederaSessionServerOptions) {
             });
           }
 
+          const available = onChain.deposit - onChain.settled;
+          if (available < challengeAmount) {
+            throw new Errors.VerificationFailedError({
+              reason: `insufficient channel balance: ${available} available, ${challengeAmount} required`,
+            });
+          }
+
           const authorizedSigner = addressEqual(
             onChain.authorizedSigner,
             zeroAddress,
@@ -347,6 +355,12 @@ export function session(params: HederaSessionServerOptions) {
             : onChain.authorizedSigner;
 
           assertUint128(cumulativeAmount);
+
+          if (cumulativeAmount < onChain.settled) {
+            throw new Errors.VerificationFailedError({
+              reason: `initial voucher amount ${cumulativeAmount} is below on-chain settled amount ${onChain.settled}`,
+            });
+          }
 
           if (cumulativeAmount > onChain.deposit) {
             throw new Errors.AmountExceedsDepositError({
@@ -386,6 +400,7 @@ export function session(params: HederaSessionServerOptions) {
             spent: challengeAmount,
             units: 1,
             finalized: false,
+            closeRequestedAt: BigInt(onChain.closeRequestedAt),
             createdAt: new Date().toISOString(),
           };
           await channelStore.updateChannel(channelId, () => state);
@@ -458,6 +473,11 @@ export function session(params: HederaSessionServerOptions) {
             throw new Errors.ChannelClosedError({
               reason: 'channel is finalized',
             });
+          if (state.closeRequestedAt && BigInt(state.closeRequestedAt) !== 0n) {
+            throw new Errors.ChannelClosedError({
+              reason: 'channel has a pending close request',
+            });
+          }
 
           if (cumulativeAmount <= state.highestVoucherAmount) {
             return makeSessionReceipt({
