@@ -26,7 +26,7 @@
 ## 0.1.4
 
 - Redeployed contracts with full Sourcify verification (both testnet + mainnet)
-- Same deterministic address on both networks: `0x401b6dc30221823361E4876f5C502e37249D84C3`
+- Same deterministic address on both networks: `0x8Aaf6690C2a6397d595F97E224fC19759De6fdaE`
 
 ## 0.1.3
 

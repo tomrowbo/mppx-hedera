@@ -24,7 +24,7 @@ import { keccak256, toBytes, toHex, hexToBytes } from 'viem';
 const OPERATOR_ID = '0.0.8569027';
 const OPERATOR_KEY = '6cabd0b8117cc36b0cb1b90d4a3151722be502cbc1c0efb255c7c3137268b904';
 // Use the escrow contract's Hedera account as recipient (it's associated with USDC)
-// Contract 0x401b6dc30221823361E4876f5C502e37249D84C3 on testnet
+// Contract 0x8Aaf6690C2a6397d595F97E224fC19759De6fdaE on testnet
 const RECIPIENT_ID = '0.0.8600318'; // HederaStreamChannel testnet (associated with USDC)
 const USDC_TOKEN_ID = '0.0.5449';
 const AMOUNT = 1; // 0.000001 USDC (1 tinybar unit)
