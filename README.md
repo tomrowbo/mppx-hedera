@@ -23,6 +23,7 @@ No facilitator. The server verifies directly against Hedera's Mirror Node REST A
 | Package | Description |
 |---|---|
 | [`packages/mppx-hedera`](packages/mppx-hedera) | The SDK — client + server methods for mppx ([README](packages/mppx-hedera/README.md)) |
+| [`hak-mppx-hedera-plugin`](hak-mppx-hedera-plugin) | [Hedera Agent Kit](https://github.com/hashgraph/hedera-agent-kit-js) plugin — AI agents pay for 402 APIs ([README](hak-mppx-hedera-plugin/README.md)) |
 | [`contracts`](contracts) | HederaStreamChannel.sol — ERC-20 payment channel escrow |
 
 ## Deployed contracts
