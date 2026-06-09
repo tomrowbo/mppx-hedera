@@ -25,7 +25,7 @@ export function getChargeRoute() {
   });
 
   _chargeRoute = mppx.charge({
-    amount: '1',
+    amount: '0.000001',
     currency: NETWORK === 'testnet' ? '0.0.5449' : '0.0.456858',
     decimals: 6,
     recipient: OPERATOR_ID,
