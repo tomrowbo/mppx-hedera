@@ -12,7 +12,7 @@ export function getChargeRoute() {
 
   const chargeHandler = hedera.charge({
     serverId: 'commerce-agent.hedera.demo',
-    recipient: OPERATOR_ID,
+    recipient: '0.0.8600318',
     testnet: NETWORK === 'testnet',
     maxRetries: 15,
     retryDelay: 2000,
@@ -28,7 +28,7 @@ export function getChargeRoute() {
     amount: '0.000001',
     currency: NETWORK === 'testnet' ? '0.0.5449' : '0.0.456858',
     decimals: 6,
-    recipient: OPERATOR_ID,
+    recipient: '0.0.8600318',
   });
 
   return _chargeRoute;
