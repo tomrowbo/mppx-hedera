@@ -1,5 +1,5 @@
 import { Client, AccountId, PrivateKey } from '@hiero-ledger/sdk';
-import { HederaAgentAPI, ToolDiscovery } from '@hashgraph/hedera-agent-kit';
+import { HederaAgentAPI, ToolDiscovery, type Context } from '@hashgraph/hedera-agent-kit';
 import { mppxHederaPlugin } from 'hak-mppx-hedera-plugin';
 
 const ACCOUNT_ID = process.env.HEDERA_ACCOUNT_ID!;
@@ -17,14 +17,14 @@ export function getAgent(): HederaAgentAPI {
     PrivateKey.fromStringECDSA(PRIVATE_KEY),
   );
 
-  const context = {
+  const context: Context & { network: string; privateKey: string } = {
     network: NETWORK,
     privateKey: PRIVATE_KEY.startsWith('0x') ? PRIVATE_KEY : `0x${PRIVATE_KEY}`,
   };
 
   const discovery = new ToolDiscovery([mppxHederaPlugin]);
-  const tools = discovery.getAllTools(context);
+  const tools = discovery.getAllTools(context as Context);
 
-  agent = new HederaAgentAPI(client, context, tools);
+  agent = new HederaAgentAPI(client, context as Context, tools);
   return agent;
 }

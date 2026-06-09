@@ -15,8 +15,8 @@
     "ai": "^4.0.0",
     "@hashgraph/hedera-agent-kit": "^4.0.0",
     "@hiero-ledger/sdk": "^2.82.0",
-    "hak-mppx-hedera-plugin": "file:../../hak-mppx-hedera-plugin",
-    "mppx-hedera": "file:../../packages/mppx-hedera",
+    "hak-mppx-hedera-plugin": "^1.2.0",
+    "mppx-hedera": "^0.2.2",
     "mppx": "^0.5.13",
     "viem": "^2.48.1",
     "zod": "^4.3.6"

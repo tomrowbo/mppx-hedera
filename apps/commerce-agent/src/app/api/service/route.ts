@@ -1,7 +1,7 @@
-import { chargeRoute } from '@/lib/mppx-server';
+import { getChargeRoute } from '@/lib/mppx-server';
 
 export async function GET(request: Request) {
-  const result = await chargeRoute(request);
+  const result = await getChargeRoute()(request);
 
   if (result.status === 402) {
     return result.challenge;
