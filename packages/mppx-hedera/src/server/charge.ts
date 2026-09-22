@@ -55,9 +55,25 @@ export interface HederaChargeServerOptions {
  * import { hedera } from 'mppx-hedera/server'
  *
  * const mppx = Mppx.create({
- *   methods: [hedera.charge({ serverId: 'api.example.com' })],
+ *   methods: [
+ *     hedera.charge({
+ *       serverId: 'api.example.com',
+ *       recipient: '0.0.12345',
+ *       testnet: true,
+ *     }),
+ *   ],
+ *   realm: 'api.example.com',
+ *   // Must be at least 32 bytes — `openssl rand -base64 32`
  *   secretKey: process.env.MPP_SECRET_KEY!,
  * })
+ *
+ * // `recipient` and `currency` come from the config above, but either can be
+ * // overridden per charge.
+ * const result = await mppx.charge({
+ *   amount: '0.01',
+ *   currency: '0.0.5449',
+ *   decimals: 6,
+ * })(request)
  * ```
  */
 export function charge(config: HederaChargeServerOptions) {
@@ -86,6 +102,22 @@ export function charge(config: HederaChargeServerOptions) {
   }
 
   return Method.toServer(chargeMethod, {
+    // Request defaults are merged BEFORE the challenge request is validated,
+    // whereas the `request()` hook below runs after. Anything the schema marks
+    // required must therefore be defaulted here — otherwise configuring it at
+    // method-construction time (the documented usage) is rejected by schema
+    // validation before the hook ever gets a chance to fill it in.
+    //
+    // `session()` has always done this; `charge()` relied on the hook alone and
+    // so broke when mppx tightened validation ordering. Keeping both is
+    // deliberate: `defaults` covers construction-time config, and the hook still
+    // handles per-request fallbacks.
+    defaults: {
+      chainId,
+      recipient: config.recipient,
+      currency: DEFAULT_TOKEN_ID[chainId],
+    } as Record<string, unknown>,
+
     request({ request }) {
       return {
         ...request,

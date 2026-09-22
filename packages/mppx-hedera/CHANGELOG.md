@@ -1,5 +1,33 @@
 # mppx-hedera
 
+## 0.2.3
+
+### Fixed
+
+- **`charge()` now honours `recipient` and `currency` configured at method
+  construction.** `hedera.charge({ recipient })` — the usage shown in the README
+  and in the function's own docstring — was rejected with a Zod validation error
+  (`recipient: expected string`) on mppx 0.10, because request defaults are merged
+  before schema validation while the `request()` hook runs after it. `charge()`
+  supplied those fields from the hook alone, so validation failed before the hook
+  could fill them in. `session()` already used `defaults` and was unaffected.
+
+  Passing `recipient` per charge still works and still overrides the configured
+  value, so this is additive — no change is required to existing code.
+
+- Corrected the `charge()` docstring, which omitted the required `recipient`
+  option and the `realm` argument, and noted that `secretKey` must be at least
+  32 bytes.
+
+### Testing
+
+- Added `test/charge-defaults.test.ts` covering construction-time configuration.
+  Every previous test passed `recipient` to both `hedera.charge()` and the
+  `mppx.charge()` call, so the documented usage was never exercised — which is
+  why this shipped broken. The new tests fail against the old code.
+- Verified against both mppx 0.5.12 and mppx 0.10.1: 121 tests pass on each.
+
+
 ## 0.2.0
 
 ### Breaking changes
