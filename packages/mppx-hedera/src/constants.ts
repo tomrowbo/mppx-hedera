@@ -299,7 +299,21 @@ export const DEFAULT_MIRROR_NODE: Record<number, string> = {
 };
 
 // ─── Hedera-native token IDs (shard.realm.num) ──────────────────
-export const USDC_TOKEN_ID_TESTNET = '0.0.5449' as const;
+/**
+ * Circle's own USDC on Hedera testnet, and the token `https://faucet.circle.com`
+ * dispenses when you pick Hedera Testnet.
+ *
+ * Up to 0.2.3 this was `0.0.5449`, a different token that is also named "USD Coin",
+ * also has symbol USDC and also has 6 decimals — only its treasury differs
+ * (`0.0.3923` vs Circle's `0.0.5176`). Nothing was wrong with it except that it is
+ * not the one anybody can obtain: there is no faucet for it, so getting any meant
+ * swapping HBAR on SaucerSwap, while Circle's faucet hands out the other one. A
+ * server settling the unobtainable token rejects a buyer who followed Circle's
+ * documentation, with an `insufficient_balance` that names a token they are
+ * holding.
+ */
+export const USDC_TOKEN_ID_TESTNET = '0.0.429274' as const;
+/** Circle's USDC on Hedera mainnet. */
 export const USDC_TOKEN_ID_MAINNET = '0.0.456858' as const;
 
 export const DEFAULT_TOKEN_ID: Record<number, string> = {

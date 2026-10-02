@@ -12,6 +12,7 @@
 import { Mppx } from 'mppx/server';
 import { Challenge, Credential, Receipt } from 'mppx';
 import {
+import { USDC_TOKEN_ID_TESTNET } from '../dist/index.js';
   Client as HederaClient,
   TransferTransaction,
   AccountId,
@@ -32,7 +33,7 @@ const OPERATOR_KEY = '6cabd0b8117cc36b0cb1b90d4a3151722be502cbc1c0efb255c7c31372
 const ESCROW_ID = '0.0.8600318';
 const SERVER_ID = 'e2e-test.hedera-mpp.dev';
 const SECRET_KEY = 'e2e-test-secret-key-32-chars-minimum!!';
-const TOKEN_ID = '0.0.5449';
+const TOKEN_ID = USDC_TOKEN_ID_TESTNET;
 const RESOURCE_URL = 'https://e2e-test.hedera-mpp.dev/api/data';
 
 let passed = 0;

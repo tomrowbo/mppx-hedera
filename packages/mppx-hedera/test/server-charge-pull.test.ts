@@ -58,13 +58,14 @@ vi.mock('@hiero-ledger/sdk', async (importOriginal) => {
 // Import after mock so the mock takes effect
 import { Transaction, Client as HederaClient } from '@hiero-ledger/sdk';
 import { charge } from '../src/server/charge.js';
+import { USDC_TOKEN_ID_TESTNET } from '../src/constants.js';
 
 // ── Test constants ──────────────────────────────────────────────────
 const SERVER_ID = 'test-server.example.com';
 const RECIPIENT = '0.0.99999';
 const CHALLENGE_ID = 'ch_test_abc123';
 const CHAIN_ID = 296; // testnet
-const TOKEN_ID = '0.0.5449'; // testnet USDC
+const TOKEN_ID = USDC_TOKEN_ID_TESTNET;
 
 // Build a valid attribution memo for tests
 const VALID_MEMO = Attribution.encode({

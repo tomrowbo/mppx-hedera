@@ -158,7 +158,11 @@ async function verifyPushMode(
   const chainId =
     credential.challenge.request.chainId ??
     credential.challenge.request.methodDetails?.chainId;
-  const tokenId = DEFAULT_TOKEN_ID[chainId];
+  // Settle the token the challenge actually advertised. `currency` is configurable on
+  // `hedera.charge()` and per call, and reading the default here instead meant a server
+  // could advertise one token and then look for transfers of another — the override was
+  // accepted on the way out and silently ignored on the way back.
+  const tokenId = credential.challenge.request.currency ?? DEFAULT_TOKEN_ID[chainId];
 
   const mirrorNodeUrl =
     config.mirrorNodeUrl ?? resolveMirrorNode(chainId);
@@ -350,7 +354,8 @@ async function verifyPullMode(
   // ── 5. Verify transfer amounts via Mirror Node ────────────────
   const { amount, chainId: rawChainId, recipient } = credential.challenge.request;
   const chainId = rawChainId ?? credential.challenge.request.methodDetails?.chainId;
-  const tokenId = DEFAULT_TOKEN_ID[chainId];
+  // Same as push mode: the challenge's own currency, not the network default.
+  const tokenId = credential.challenge.request.currency ?? DEFAULT_TOKEN_ID[chainId];
   const mirrorNodeUrl = config.mirrorNodeUrl ?? resolveMirrorNode(chainId);
   const urlTxId = formatTxIdForMirrorNode(transactionId);
 

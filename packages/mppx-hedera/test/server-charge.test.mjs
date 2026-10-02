@@ -10,6 +10,7 @@
 import { hedera } from '../dist/server/index.js';
 import { Attribution } from '../dist/index.js';
 import { Store } from 'mppx';
+import { USDC_TOKEN_ID_TESTNET } from '../dist/index.js';
 
 // ─── Constants ───────────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ const SERVER_ID = 'test-server';
 const RECIPIENT = '0.0.99999';
 const CHALLENGE_ID = 'test-challenge-123';
 const TX_ID = '0.0.12345@1234567890.123456789';
-const TOKEN_ID = '0.0.5449'; // testnet USDC
+const TOKEN_ID = USDC_TOKEN_ID_TESTNET; // testnet USDC
 
 // ─── Helpers ─────────────────────────────────────────────────────────
 

@@ -13,6 +13,7 @@ import { session } from '../src/server/session.js';
 import { charge } from '../src/server/charge.js';
 import * as Sse from '../src/server/sse.js';
 import * as Attribution from '../src/attribution.js';
+import { USDC_TOKEN_ID_TESTNET } from '../src/constants.js';
 
 // ── Constants ────────────────────────────────────────────────────────
 
@@ -32,7 +33,7 @@ const CHANNEL_ID =
 const SERVER_ID = 'test-server';
 const CHALLENGE_ID = 'test-challenge-123';
 const TX_ID = '0.0.12345@1234567890.123456789';
-const TOKEN_ID = '0.0.5449'; // testnet USDC
+const TOKEN_ID = USDC_TOKEN_ID_TESTNET;
 
 // ── Mock client factory (session tests) ─────────────────────────────
 

@@ -72,8 +72,9 @@ export function charge(config: HederaChargeClientOptions) {
       const req = challenge.request as any;
       const chainId = req.methodDetails?.chainId ?? (network === 'mainnet' ? 295 : 296);
 
-      // Resolve Hedera-native token ID
-      const tokenId = DEFAULT_TOKEN_ID[chainId];
+      // Pay in the token the challenge named. Falling back to the network default here
+      // would have the buyer transfer one token against an offer denominated in another.
+      const tokenId = req.currency ?? DEFAULT_TOKEN_ID[chainId];
       if (!tokenId) throw new Error(`No USDC token configured for chainId ${chainId}`);
 
       const amount = Number(BigInt(req.amount));

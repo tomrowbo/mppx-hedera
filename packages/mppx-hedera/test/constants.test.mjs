@@ -51,8 +51,8 @@ test('USDC_MAINNET starts with 0x and is 42 chars', () => {
 
 // --- USDC token IDs ---
 
-test('USDC_TOKEN_ID_TESTNET is "0.0.5449"', () => {
-  assert.equal(DEFAULT_TOKEN_ID[296], '0.0.5449');
+test('USDC_TOKEN_ID_TESTNET is Circle\'s "0.0.429274"', () => {
+  assert.equal(DEFAULT_TOKEN_ID[296], '0.0.429274'); // Circle's testnet USDC
 });
 
 test('USDC_TOKEN_ID_MAINNET is "0.0.456858"', () => {

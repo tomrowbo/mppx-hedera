@@ -12,6 +12,7 @@ import { Mppx } from 'mppx/server';
 import { Challenge, Credential, Receipt } from 'mppx';
 import { hedera } from '../src/server/index.js';
 import * as Attribution from '../src/attribution.js';
+import { USDC_TOKEN_ID_TESTNET } from '../src/constants.js';
 
 // ─── Test constants ─────────────────────────────────────────────────
 
@@ -20,7 +21,7 @@ const RECIPIENT = '0.0.99999';
 const SECRET_KEY = 'test-secret-key-32-chars-minimum!!';
 const REALM = 'test-server.example.com';
 const TX_ID = '0.0.12345@1234567890.123456789';
-const TOKEN_ID = '0.0.5449'; // testnet USDC
+const TOKEN_ID = USDC_TOKEN_ID_TESTNET;
 const AMOUNT = '0.01'; // human-readable, schema transforms to smallest unit
 const AMOUNT_RAW = '10000'; // 0.01 * 10^6 = 10000 (USDC has 6 decimals)
 const RESOURCE_URL = 'https://test-server.example.com/api/resource';
