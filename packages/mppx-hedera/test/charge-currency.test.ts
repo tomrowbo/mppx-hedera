@@ -165,3 +165,31 @@ describe('pull-mode verification honours the challenge currency', () => {
     expect(result.status).toBe('success');
   });
 });
+
+/**
+ * The invariant 0.3.0 broke: this library states the testnet token twice, once as a native
+ * `0.0.x` id for the HTS paths and once as an EVM alias for the contract paths. A reader
+ * cannot tell them apart by eye — `0x…1549` and `0.0.429274` look unrelated — so nothing
+ * caught the two drifting onto different tokens until a consumer compared them.
+ */
+describe('the native token id and the EVM alias name the same token', () => {
+  /** An HTS token's EVM alias is its entity number, big-endian, left-padded to 20 bytes. */
+  const aliasOf = (tokenId: string) => '0x' + Number(tokenId.split('.')[2]).toString(16).padStart(40, '0');
+
+  it('agrees on testnet', async () => {
+    const { USDC_TESTNET } = await import('../src/constants.js');
+    expect(USDC_TESTNET.toLowerCase()).toBe(aliasOf(USDC_TOKEN_ID_TESTNET));
+  });
+
+  it('agrees on mainnet', async () => {
+    const { USDC_MAINNET } = await import('../src/constants.js');
+    expect(USDC_MAINNET.toLowerCase()).toBe(aliasOf(USDC_TOKEN_ID_MAINNET));
+  });
+
+  it('agrees for every chain in both default maps', async () => {
+    const { DEFAULT_CURRENCY, DEFAULT_TOKEN_ID } = await import('../src/constants.js');
+    for (const [chainId, tokenId] of Object.entries(DEFAULT_TOKEN_ID)) {
+      expect(DEFAULT_CURRENCY[Number(chainId)].toLowerCase()).toBe(aliasOf(tokenId));
+    }
+  });
+});

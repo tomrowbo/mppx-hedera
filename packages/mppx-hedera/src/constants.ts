@@ -10,7 +10,16 @@ import { hederaTestnet, hederaMainnet } from './internal.js';
 
 // ─── USDC on Hedera (HTS token exposed as ERC-20 via HIP-218) ─────
 // Using 0.0.5449 (testnet USDC, 212 USDC available, verified 2026-04-11)
-export const USDC_TESTNET = '0x0000000000000000000000000000000000001549' as const; // 0.0.5449
+/**
+ * EVM alias of Circle's testnet USDC, the same token `USDC_TOKEN_ID_TESTNET` names.
+ *
+ * These two have to denote the same token. Until 0.3.1 they did not: 0.3.0 moved the native
+ * id to Circle's `0.0.429274` and left this alias on `0.0.5449`, so the EVM paths and the
+ * native paths of one library were charging different tokens. It surfaced through the Agent
+ * Kit plugin, which validates a 402 challenge's currency against this constant and so refused
+ * every charge a correctly configured server advertised.
+ */
+export const USDC_TESTNET = '0x0000000000000000000000000000000000068cda' as const; // 0.0.429274
 export const USDC_MAINNET = '0x000000000000000000000000000000000006f89a' as const; // 0.0.456858
 export const USDC_DECIMALS = 6;
 

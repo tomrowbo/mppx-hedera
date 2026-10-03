@@ -426,6 +426,25 @@ async function verifyPullMode(
  * Fetches a transaction from the Mirror Node REST API with retry logic
  * to handle the 3-5 second indexing lag after consensus.
  */
+/**
+ * One transaction id can name several Mirror Node records.
+ *
+ * A transfer that auto-associates a token on the receiving account emits a sibling
+ * `CRYPTOUPDATEACCOUNT` under the same id, and the Mirror Node returns it *first* — so taking
+ * `transactions[0]` reads a record with no memo and no token transfers, and verification
+ * rejects a payment that actually settled. The buyer is debited and gets a 402 back.
+ *
+ * It only happens when the receiving account associates the token as part of the transfer,
+ * which is to say on a fresh buyer's very first payment: the one case where a new developer
+ * has no reason to suspect the library rather than themselves.
+ *
+ * So pick the transfer explicitly. The fallback keeps the old behaviour for any shape not
+ * seen here rather than throwing on an unfamiliar one.
+ */
+function selectTransferRecord(records: any[]): any {
+  return records.find((record) => record?.name === 'CRYPTOTRANSFER') ?? records[0];
+}
+
 async function fetchTransaction(
   mirrorNodeUrl: string,
   urlTxId: string,
@@ -439,7 +458,8 @@ async function fetchTransaction(
 
     if (resp.ok) {
       const data = await resp.json();
-      if (data?.transactions?.length) return data.transactions[0];
+      const records = data?.transactions;
+      if (records?.length) return selectTransferRecord(records);
     }
 
     if (resp.status === 404 && attempt < maxRetries) {
